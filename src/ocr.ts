@@ -30,6 +30,17 @@ export function parseRecognizedCredentials(text: string): OcrDraft {
       }
     }
   }
+  // OCR often puts a form label and the value on separate lines.
+  // Accept only known labels and only when the next line does not look like
+  // another known label; never invent secret values from free text.
+  for (let i = 0; i < lines.length - 1; i++) {
+    const known = keys.find(k => k.pattern.test(lines[i].replace(/[:：=]$/u, '').trim()));
+    if (!known || draft[known.target]) continue;
+    const candidate = clean(lines[i + 1]);
+    if (!candidate || keys.some(k => k.pattern.test(candidate)) || /^[•●*]{3,}$/u.test(candidate)) continue;
+    if (known.target === 'pin' && !/^\\d{3,16}$/u.test(candidate)) continue;
+    draft[known.target] = candidate;
+  }
   // Conservative fallback for unambiguous email and URL only. Password/PIN
   // are never inferred from random text because OCR can misread characters.
   if (!draft.email) {
