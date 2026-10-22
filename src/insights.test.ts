@@ -15,7 +15,7 @@ describe('local and private vault insights', () => {
     expect(JSON.stringify(snapshot)).not.toContain('same-secret-123!!');
   });
   it('tracks field copy and opens, and retains latest 10 history items', () => {
-    let entry = { ...blankEntry(), password:'an-old-password' };
+    let entry = { ...blankEntry(), password:'an-old-password', keepPasswordHistory:true };
     for (let i = 0; i < 11; i++) {
       const next = { ...entry, password:'new-password-' + i };
       entry = trackPasswordHistory(entry, next);

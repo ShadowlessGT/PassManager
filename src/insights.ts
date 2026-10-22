@@ -38,14 +38,17 @@ export function logActivity(entry: VaultEntry, kind: ActivityKind, fieldType?: s
 }
 
 export function trackPasswordHistory(previous: VaultEntry | undefined, current: VaultEntry): VaultEntry {
+  // Storing earlier secrets is explicitly opt-in and off by default.
+  if (!current.keepPasswordHistory) return { ...current, passwordHistory: [] };
+  const existing = current.passwordHistory ?? previous?.passwordHistory ?? [];
   if (!previous || previous.password === current.password || !previous.password) {
-    return { ...current, passwordHistory: current.passwordHistory ?? previous?.passwordHistory ?? [] };
+    return { ...current, passwordHistory: existing };
   }
-  const existing = current.passwordHistory ?? previous.passwordHistory ?? [];
-  const now = Date.now();
+  const now = current.passwordChangedAt !== previous.passwordChangedAt && current.passwordChangedAt
+    ? current.passwordChangedAt : Date.now();
   return {
     ...current,
-    passwordChangedAt: current.passwordChangedAt ?? now,
+    passwordChangedAt: now,
     passwordHistory: [...existing, { value: previous.password, replacedAt: now }].slice(-10)
   };
 }

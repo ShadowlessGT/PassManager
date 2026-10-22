@@ -43,6 +43,7 @@ export type VaultEntry = {
   activity?: EntryActivity;
   // Old passwords stay encrypted within the vault. Max 10 retained per entry.
   passwordHistory?: SecretHistoryItem[];
+  keepPasswordHistory?: boolean;
 };
 
 export type VaultData = { version: 1; entries: VaultEntry[] };

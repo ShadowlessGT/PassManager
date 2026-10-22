@@ -166,6 +166,10 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
             </div>
           </label>
           <label>Homepage / URL<input value={draft.website} onChange={e => update('website', e.target.value)} placeholder="https://beispiel.de"/></label>
+          <label className="check-line"><input type="checkbox" checked={Boolean(draft.keepPasswordHistory)}
+            onChange={e => update('keepPasswordHistory', e.target.checked)}/>
+            <span>Frühere Passwörter verschlüsselt aufbewahren (max. 10, optional)</span>
+          </label>
           <label>Passwort vergeben / zuletzt geändert am
             <input type="date" value={draft.passwordChangedAt ? new Date(draft.passwordChangedAt).toISOString().slice(0, 10) : ''} max={new Date().toISOString().slice(0, 10)}
               onChange={e => update('passwordChangedAt', e.target.value ? new Date(e.target.value + 'T12:00:00').getTime() : undefined)} />
