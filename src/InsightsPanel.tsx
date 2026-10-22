@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, BarChart3, CalendarClock, Copy, Eye, Fingerprint, KeyRound, ShieldCheck, Star, Trash2, UsersRound } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarClock, Copy, Eye, Fingerprint, KeyRound, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
 import type { VaultData, VaultEntry } from './types';
 import { calculateInsights } from './insights';
 
