@@ -560,7 +560,7 @@ export default function App() {
               <div className="info-panel"><ShieldCheck size={21}/><p>Freigaben werden erst aktiviert, wenn Empfängerschlüssel, Einladungen, Widerruf und Verschlüsselung vollständig umgesetzt und überprüft sind. Es werden keine Klartext-Passwörter über Links oder Firebase geteilt.</p></div>
             </section>
 
-            <p className="version-line">PassManager v0.1.0 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">PassManager v0.2.0 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
