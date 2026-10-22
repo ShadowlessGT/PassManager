@@ -16,6 +16,24 @@ An offline-first password vault, built with React 19, TypeScript, Vite, and Capa
 - Android FLAG_SECURE screenshot/screen-recording protection with official Capacitor Privacy Screen plugin.
 - Optional Firebase Email/Password authentication plus **manual** encrypted cloud upload/restore; no unencrypted vault values uploaded.
 
+## Added in v0.2.0 (development branch)
+
+- Optional additional per-item fields, with editable label and type: text, secret, numeric PIN, number, multi-line, email or clickable website. New items start with PIN and address templates. Existing encrypted items remain readable.
+- Record creation/last-modified date, plus manually adjustable timestamp for when a password was set or changed. Secret fields keep individual timestamps and are hidden by default.
+- CSV (including German semicolon-separated files), Excel XLSX and Bitwarden-style CSV import with first-eight-item preview, duplicate skipping, custom unknown-column preservation, **local-only parsing**, maximum 2 MB / 1000 records.
+- Optional Firebase callable endpoints for one-time **free gift codes**, admin-only issuance, hashed codes and server-tracked entitlements. Admin access requires a trusted `passmanagerAdmin` Firebase custom claim. App Check enforcement must be configured on both native and web admin app before deploying endpoints.
+- Landing page prototype at `/landing.html` and incomplete *draft* privacy notice at `/privacy.html`; **not legally ready for production**.
+
+### Licensing and pricing
+
+The app remains fully usable as a free **development preview**. This prototype does not yet enforce paid access or process purchases. Do not ship a monetized build without completing verified Google Play Billing integration and testing Play's own promo-code flows.
+
+Use **Google Play Console promotions** for discount/trial campaigns on billed Android products. Do not treat Firebase gifts as an alternate payment method. Firebase gift codes should be issued **without payment** for discretionary access and are separate from Play Billing receipts.
+
+To deploy gift functions: create Firebase project, provision a random 32+-byte secret `firebase functions:secrets:set PASSMANAGER_REDEMPTION_HMAC_KEY`, install `functions/` dependencies, configure Firebase App Check and provision trusted admin via Firebase Admin SDK custom claim (never choose admins by email or client input), then `firebase deploy --only functions,firestore:rules`. Codes cannot be used until the backend, project setup and App Check configuration are complete.
+
+Before shipping: add Play Billing purchase-token verification on the backend, cancellation/refund checks, account linking, secure offline entitlement caching, and a fair path to read/export users' existing vault entries after license expiry. Never lock users out of their own stored secrets.
+
 ## Start locally
 
 Requirements: Node.js >= 20, npm, Android Studio + SDK for Android builds.

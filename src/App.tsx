@@ -5,14 +5,17 @@ import {
   Copy, Edit3, ExternalLink, Eye, EyeOff, Fingerprint, Folder,
   ImagePlus, KeyRound, LockKeyhole, LogOut, Mail, Plus, Search,
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
-  X, Globe2, Shield
+  X, Globe2, Shield, CalendarClock
 } from 'lucide-react';
-import { blankEntry, newVault } from './types';
-import type { VaultData, VaultEntry } from './types';
+import { blankEntry, newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
+import type { VaultData, VaultEntry, EntryField } from './types';
+import ImportPanel from './ImportPanel';
+import LicensePanel from './LicensePanel';
+import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
 import { readLocalVault, writeLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
-import { cloudConfigured, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload } from './cloud';
+import { cloudConfigured, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 
 type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'settings';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
@@ -66,7 +69,7 @@ type EditorProps = {
 };
 
 function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps) {
-  const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories] });
+  const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
   const [categoryText, setCategoryText] = useState(draft.categories.join(', '));
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -74,6 +77,20 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
 
   function update<K extends keyof VaultEntry>(key: K, value: VaultEntry[K]) {
     setDraft(previous => ({ ...previous, [key]: value }));
+  }
+
+  function updateField(id: string, patch: Partial<EntryField>) {
+    setDraft(previous => ({
+      ...previous,
+      fields: (previous.fields ?? []).map(field => field.id === id ? { ...field, ...patch, updatedAt: Date.now() } : field)
+    }));
+  }
+
+  function addField(label: string, kind: EntryField['kind']) {
+    setDraft(previous => ({
+      ...previous,
+      fields: [...(previous.fields ?? []), makeField(label, kind)]
+    }));
   }
 
   async function addImages(event: ChangeEvent<HTMLInputElement>) {
@@ -101,6 +118,9 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
     event.preventDefault();
     if (!draft.title.trim()) { setError('Bitte einen Namen eingeben.'); return; }
     const tags = [...new Set(categoryText.split(',').map(value => value.trim()).filter(Boolean))];
+    const fields = draft.fields ?? [];
+    const fieldError = validateEntryFields(fields);
+    if (fieldError) { setError(fieldError); return; }
     setSaving(true);
     setError('');
     try {
@@ -109,7 +129,12 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
         title: draft.title.trim(),
         categories: tags,
         person: draft.person.trim(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        passwordChangedAt: draft.passwordChangedAt !== entry.passwordChangedAt
+          ? draft.passwordChangedAt
+          : (draft.password !== entry.password
+            ? (draft.password ? Date.now() : undefined)
+            : draft.passwordChangedAt)
       });
       onClose();
     } catch (reason) {
@@ -142,6 +167,41 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
             </div>
           </label>
           <label>Homepage / URL<input value={draft.website} onChange={e => update('website', e.target.value)} placeholder="https://beispiel.de"/></label>
+          <label>Passwort vergeben / zuletzt geändert am
+            <input type="date" value={draft.passwordChangedAt ? new Date(draft.passwordChangedAt).toISOString().slice(0, 10) : ''} max={new Date().toISOString().slice(0, 10)}
+              onChange={e => update('passwordChangedAt', e.target.value ? new Date(e.target.value + 'T12:00:00').getTime() : undefined)} />
+          </label>
+          <div className="form-section-title">Weitere Felder</div>
+          <p className="input-help">Zusätzliche Felder kannst du frei benennen und als Text, PIN, Passwort, Adresse, E-Mail oder Link behandeln lassen.</p>
+          {(draft.fields ?? []).map(field => <div className="custom-field-row" key={field.id}>
+            <div className="custom-field-toolbar">
+              <input aria-label="Feldname" value={field.label} placeholder="Feldname" maxLength={100} onChange={e => updateField(field.id, {label: e.target.value})} />
+              <select aria-label={'Feldtyp für ' + field.label} value={field.kind} onChange={e => updateField(field.id, {kind: e.target.value as EntryField['kind']})}>{FIELD_KINDS.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}</select>
+              <button type="button" className="field-remove" onClick={() => update('fields', (draft.fields ?? []).filter(item => item.id !== field.id))} aria-label="Feld entfernen"><Trash2 size={16}/></button>
+            </div>
+            {field.kind === 'multiline'
+              ? <textarea value={field.value} rows={3} placeholder="Mehrzeiliger Wert" onChange={e => updateField(field.id, {value: e.target.value})}/>
+              : <div className="field-with-actions">
+                  <input
+                    aria-label={field.label}
+                    value={field.value}
+                    type={field.kind === 'secret' || field.kind === 'pin' ? (showPassword ? 'text' : 'password') : field.kind === 'email' ? 'email' : field.kind === 'url' ? 'url' : 'text'}
+                    inputMode={field.kind === 'pin' || field.kind === 'number' ? 'numeric' : undefined}
+                    autoComplete="off"
+                    placeholder={field.kind === 'pin' ? 'Nur Ziffern' : field.kind === 'secret' ? 'Verdeckter Wert' : 'Wert eingeben'}
+                    onChange={e => updateField(field.id, { value: field.kind === 'pin' ? e.target.value.replace(/[^0-9]/g, '') : e.target.value })}
+                  />
+                  {(field.kind === 'secret' || field.kind === 'pin') && <button type="button" className="field-action" onClick={() => setShowPassword(!showPassword)} aria-label="Geheime Felder anzeigen">{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button>}
+                </div>}
+          </div>)}
+          {(draft.fields ?? []).length < 50 && <div className="field-buttons">
+            <select aria-label="Vordefiniertes Feld hinzufügen" defaultValue="" onChange={e => {
+              const preset = ENTRY_FIELD_PRESETS.find(item => item.label === e.target.value);
+              if (preset) addField(preset.label, preset.kind);
+              e.target.value = '';
+            }}><option value="">+ Vordefiniertes Feld...</option>{ENTRY_FIELD_PRESETS.map(preset => <option key={preset.label} value={preset.label}>{preset.label}</option>)}</select>
+            <button type="button" className="secondary-btn" onClick={() => addField('Neues Feld', 'text')}><Plus size={17}/> Eigenes Feld</button>
+          </div>}
           <div className="form-section-title">Organisieren</div>
           <label>Person / Besitzer<input list="people-list" value={draft.person} onChange={e => update('person', e.target.value)} placeholder="z. B. Privat, Tamer, Familie"/><datalist id="people-list">{people.map(person => <option key={person} value={person}/>)}</datalist></label>
           <label>Kategorien <span className="hint">Mehrere durch Komma trennen</span><input value={categoryText} onChange={e => setCategoryText(e.target.value)} placeholder="Arbeit, Familie, Shopping"/></label>
@@ -190,6 +250,7 @@ export default function App() {
   const [cloudLoginPassword, setCloudLoginPassword] = useState('');
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
+  const [showImporter, setShowImporter] = useState(false);
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
 
@@ -199,6 +260,7 @@ export default function App() {
       .finally(() => setLoading(false));
     void deviceUnlockSupported().then(setDeviceSupported).catch(() => setDeviceSupported(false));
     void biometricIsEnabled().then(setDeviceEnabled).catch(() => setDeviceEnabled(false));
+    return onCloudEmailChange(setCloudUser);
   }, []);
 
   useEffect(() => {
@@ -302,7 +364,7 @@ export default function App() {
   }
 
   async function copyValue(value: string, label: string) {
-    try { await navigator.clipboard.writeText(value); setNotice(label + ' kopiert'); }
+    try { await Clipboard.write({ string: value }); setNotice(label + ' kopiert'); }
     catch { setNotice('Kopieren nicht möglich – Clipboard-Berechtigung prüfen'); }
   }
 
@@ -360,7 +422,7 @@ export default function App() {
     if (categoryFilter && !item.categories.includes(categoryFilter)) return false;
     if (personFilter && item.person !== personFilter) return false;
     const needle = query.toLocaleLowerCase('de');
-    return [item.title, item.description, item.username, item.email, item.website, item.person, ...item.categories]
+    return [item.title, item.description, item.username, item.email, item.website, item.person, ...item.categories, ...(item.fields ?? []).map(field => field.label)]
       .some(value => value.toLocaleLowerCase('de').includes(needle));
   }).sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt), [data, tab, categoryFilter, personFilter, query]);
   const selected = entries.find(item => item.id === selectedId) ?? null;
@@ -385,6 +447,7 @@ export default function App() {
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? 'Tresor entsperren' : 'Sicheren Tresor erstellen'} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
         {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck, Gesicht oder Gerätesperre öffnen</button>}
+        <LicensePanel compact/>
         <p className="lock-footnote">{hasVault ? 'Dein Master-Passwort verlässt dieses Gerät nicht.' : 'Wichtig: Ohne Master-Passwort ist dein Tresor nicht wiederherstellbar. Bewahre es sicher auf.'}</p>
       </section>
       <footer className="lock-footer">PassManager · by Shadowless Studios</footer>
@@ -459,6 +522,12 @@ export default function App() {
           </>}
 
           {tab === 'settings' && <div className="settings-layout">
+            <LicensePanel/>
+            <section className="settings-card">
+              <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span><div><h2>Passwörter importieren</h2><p>CSV und Excel (.xlsx) von anderen Passwort-Managern und Tabellen.</p></div></div>
+              <p className="settings-note">Import ausschließlich auf diesem Gerät, keine Uploads. Vor dem Speichern werden Dubletten geprüft. Bitte unverschlüsselte Quelldatei nach dem Import sicher entfernen.</p>
+              <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}><ArrowDownToLine size={17}/> Import-Assistent öffnen</button>
+            </section>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
               <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
@@ -506,6 +575,18 @@ export default function App() {
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
             {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : '••••••••••••'}</strong><button className="icon-btn compact" onClick={() => setReveal(old => old.includes(selected.id) ? old.filter(id => id !== selected.id) : [...old, selected.id])} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            {selected.password && selected.passwordChangedAt && <div className="detail-field"><span><CalendarClock size={16}/> Passwort vergeben / geändert</span><strong>{formatDate(selected.passwordChangedAt)}</strong></div>}
+            {(selected.fields ?? []).filter(field => field.value).map(field => <div className="detail-field" key={field.id}>
+              <span><KeyRound size={16}/>{field.label}</span>
+              <div>
+                <strong className={field.kind === 'secret' || field.kind === 'pin' ? (reveal.includes(field.id) ? 'secret-text' : 'masked') : ''}>
+                  {field.kind === 'secret' || field.kind === 'pin' ? (reveal.includes(field.id) ? field.value : '••••••••') : field.value}
+                </strong>
+                {(field.kind === 'secret' || field.kind === 'pin') && <button className="icon-btn compact" type="button" onClick={() => setReveal(current => current.includes(field.id) ? current.filter(id => id !== field.id) : [...current, field.id])} aria-label="Wert anzeigen">{reveal.includes(field.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
+                {field.kind === 'url' && safeUrl(field.value) && <a href={safeUrl(field.value)!} target="_blank" rel="noopener noreferrer" aria-label="Link öffnen"><ExternalLink size={18}/></a>}
+                <button className="icon-btn compact" type="button" onClick={() => void copyValue(field.value, field.label)} aria-label={field.label + ' kopieren'}><Copy size={18}/></button>
+              </div>
+            </div>)}
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}
             {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} alt={'Anhang ' + (index + 1)}/>)}</div></div>}
@@ -514,6 +595,10 @@ export default function App() {
         </section>
       </div>}
 
+      {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async incoming => {
+        await persist({ ...data, entries: [...incoming, ...data.entries] });
+        setNotice(incoming.length + ' Einträge verschlüsselt importiert');
+      }}/>}
       {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} onClose={() => setEditing(null)} onSave={saveEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>

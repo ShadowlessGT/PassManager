@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { EncryptedEnvelope } from './crypto';
 
@@ -46,4 +46,8 @@ export async function cloudDownload(): Promise<EncryptedEnvelope | null> {
   const envelope = snapshot.data().envelope as EncryptedEnvelope;
   if (!envelope || envelope.v !== 1 || typeof envelope.ciphertext !== 'string') throw new Error('Ungültige Cloud-Daten.');
   return envelope;
+}
+
+export function onCloudEmailChange(callback: (email: string | null) => void): () => void {
+  return auth ? onAuthStateChanged(auth, user => callback(user?.email ?? null)) : () => {};
 }

@@ -17,6 +17,14 @@ service cloud.firestore {
         && request.resource.data.envelope.ciphertext.size() < 900000
         && request.resource.data.updatedAt is timestamp;
     }
+    // Entitlements can be created/modified ONLY by trusted Admin SDK Functions.
+    match /accessEntitlements/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    // Raw codes are never stored; hashed redemption records and rate limits are server-private.
+    match /redeemCodes/{codeHash} { allow read, write: if false; }
+    match /redemptionAttempts/{uid} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

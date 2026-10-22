@@ -206,3 +206,40 @@ h1, h2, h3, p { margin-top: 0; }
   .settings-card { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* Flexible field editor */
+.custom-field-row { background: #20283b; border: 1px solid #363e58; border-radius: 12px; padding: 11px; display: grid; gap: 10px; }
+.custom-field-toolbar { display: flex; gap: 8px; align-items: center; }
+.custom-field-toolbar input { flex: 1; min-width: 0; }
+.custom-field-toolbar select { flex: 1; min-width: 0; }
+.custom-field-toolbar select, .field-buttons select { border-radius: 10px; padding: 11px; border: 1px solid #414968; color: #e1dff6; background: #151b2a; font-size: 12px; }
+.field-remove { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; color: #ff9ba8; border: 1px solid #69394b; border-radius: 9px; background: #452536; }
+.field-buttons { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.field-buttons select { flex: 1; min-width: 150px; }
+.custom-field-row textarea { width: 100%; border-radius: 10px; border: 1px solid #353e54; color: white; background: #111725; padding: 11px; resize: vertical; }
+.import-drop { display: grid; gap: 12px; color: #d6d9ef; border: 1px dashed #6d648e; border-radius: 13px; padding: 17px; background: #232742; }
+.import-drop input { font-size: 13px; color: #bec7dd; width: 100%; }
+.import-drop small { color: #909fb5; font-size: 11px; line-height: 1.5; }
+.import-stats { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.import-stats h3 { margin: 0; font-size: 15px; }
+.import-stats span { color: #aca2fa; font-size: 12px; }
+.import-preview { display: grid; gap: 6px; background: #111724; border: 1px solid #353b55; border-radius: 12px; padding: 9px; max-height: 290px; overflow-y: auto; }
+.import-preview-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 7px 8px; border-bottom: 1px solid #30384b; }
+.import-preview-row strong { font-size: 12px; }
+.import-preview-row small { color: #9da8c0; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.import-preview-row span { font-size: 10px; grid-column: 1 / -1; color: #7b89a2; }
+
+.license-compact { margin-top: 26px; padding: 17px; border: 1px solid #3c425e; border-radius: 15px; background: #1b2131; text-align: left; }
+.license-compact .settings-heading { margin-bottom: 12px; }
+.license-compact h2 { font-size: 14px; margin: 0 0 6px; }
+.license-compact p { font-size: 11px; }
+.license-compact .cloud-login label { text-align: left; }
+.code-entry { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.code-entry input, .admin-controls input, .generated-codes { color: #f1f4fe; border: 1px solid #414965; border-radius: 9px; padding: 11px; background: #111724; min-width: 0; }
+.code-entry input { flex: 1; width: 100%; }
+.admin-code-panel { padding-top: 18px; margin-top: 18px; border-top: 1px solid #343b52; }
+.admin-code-panel h3 { font-size: 14px; margin: 0 0 8px; }
+.admin-controls { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.admin-controls label { display: grid; gap: 6px; color: #bac2d8; font-size: 11px; }
+.admin-controls input { width: 125px; }
+.generated-codes { margin-top: 15px; width: 100%; resize: vertical; font: 12px/1.7 ui-monospace,Consolas,monospace; }
