@@ -5,35 +5,34 @@ import {
   Copy, Edit3, ExternalLink, Eye, EyeOff, Fingerprint, Folder,
   ImagePlus, KeyRound, LockKeyhole, LogOut, Mail, Plus, Search,
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
-  X, Globe2, Shield, CalendarClock
+  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon
 } from 'lucide-react';
 import { blankEntry, newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
 import type { VaultData, VaultEntry, EntryField } from './types';
 import ImportPanel from './ImportPanel';
 import LicensePanel from './LicensePanel';
+import InsightsPanel from './InsightsPanel';
+import QuickAdd from './QuickAdd';
+import OcrCapture from './OcrCapture';
+import { generateStrongPassword } from './passwordGenerator';
+import { logActivity, trackPasswordHistory } from './insights';
+import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
 import { readLocalVault, writeLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
 import { cloudConfigured, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 
-type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'settings';
+type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
   { id: 'vault', label: 'Tresor', icon: KeyRound },
   { id: 'favorites', label: 'Favoriten', icon: Star },
   { id: 'categories', label: 'Kategorien', icon: Folder },
-  { id: 'people', label: 'Personen', icon: UsersRound },
+  { id: 'insights', label: 'Insights', icon: BarChart3 },
   { id: 'settings', label: 'Einstellungen', icon: Settings2 }
 ];
 
-function generatePassword(): string {
-  const alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*?-_';
-  const chars: string[] = [];
-  const nums = new Uint32Array(24);
-  crypto.getRandomValues(nums);
-  for (const num of nums) chars.push(alphabet[num % alphabet.length]);
-  return chars.join('');
-}
+const generatePassword = generateStrongPassword;
 
 function safeUrl(value: string): string | null {
   if (!value.trim()) return null;
@@ -251,6 +250,10 @@ export default function App() {
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [showImporter, setShowImporter] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showOCR, setShowOCR] = useState(false);
+  const dataRef = useRef<VaultData | null>(null);
+  const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
 
@@ -270,7 +273,9 @@ export default function App() {
   }, [notice]);
 
   function lockVault() {
+    dataRef.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
+    setShowOCR(false); setShowQuickAdd(false);
     setSelectedId(null); setEditing(null); setReveal([]); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
   }
@@ -313,6 +318,7 @@ export default function App() {
       const derived = await deriveVaultKey(master, vaultSalt);
       const clear = stored ? await decryptVault(stored, derived) : newVault();
       if (!stored) await writeLocalVault(await encryptVault(clear, derived, vaultSalt));
+      dataRef.current = clear;
       setKey(derived); setSalt(vaultSalt); setData(clear); setHasVault(true);
       setMaster(''); setConfirm(''); lastActivity.current = Date.now();
     } catch {
@@ -327,33 +333,46 @@ export default function App() {
       if (!stored) throw new Error('Kein Tresor vorhanden.');
       const derived = await unlockWithDevice();
       const clear = await decryptVault(stored, derived);
+      dataRef.current = clear;
       setKey(derived); setSalt(stored.salt); setData(clear); lastActivity.current = Date.now();
     } catch {
       setGateError('Geräteentsperrung fehlgeschlagen. Bitte Master-Passwort verwenden.');
     } finally { setWorking(false); }
   }
 
-  async function persist(next: VaultData) {
-    if (!key || !salt) throw new Error('Tresor ist gesperrt.');
-    const encrypted = await encryptVault(next, key, salt);
-    await writeLocalVault(encrypted);
-    setData(next);
+
+  async function mutateVault(transform: (current: VaultData) => VaultData): Promise<void> {
+    const activeKey = key, activeSalt = salt;
+    const task = writes.current.catch(() => {}).then(async () => {
+      const current = dataRef.current;
+      if (!current || !activeKey || !activeSalt) throw new Error('Tresor ist gesperrt.');
+      const next = transform(current);
+      const encrypted = await encryptVault(next, activeKey, activeSalt);
+      await writeLocalVault(encrypted);
+      // Locking the UI must not be undone by a pending write.
+      if (dataRef.current !== null) { dataRef.current = next; setData(next); }
+    });
+    writes.current = task.catch(() => {});
+    await task;
   }
 
   async function saveEntry(entry: VaultEntry) {
-    if (!data) throw new Error('Tresor ist gesperrt.');
-    const existing = data.entries.some(value => value.id === entry.id);
-    const next = existing
-      ? data.entries.map(value => value.id === entry.id ? entry : value)
-      : [entry, ...data.entries];
-    await persist({ ...data, entries: next });
-    setNotice(existing ? 'Eintrag aktualisiert' : 'Eintrag verschlüsselt gespeichert');
+    let existed = false;
+    await mutateVault(current => {
+      const previous = current.entries.find(value => value.id === entry.id);
+      existed = Boolean(previous);
+      const replacement = trackPasswordHistory(previous, { ...entry, activity: previous?.activity ?? entry.activity });
+      return { ...current, entries: previous
+        ? current.entries.map(value => value.id === entry.id ? replacement : value)
+        : [replacement, ...current.entries] };
+    });
+    setNotice(existed ? 'Eintrag aktualisiert' : 'Eintrag verschlüsselt gespeichert');
   }
 
   async function deleteEntry(entry: VaultEntry) {
-    if (!data || !window.confirm('Eintrag "' + entry.title + '" unwiderruflich löschen?')) return;
+    if (!window.confirm('Eintrag "' + entry.title + '" unwiderruflich löschen?')) return;
     try {
-      await persist({ ...data, entries: data.entries.filter(value => value.id !== entry.id) });
+      await mutateVault(current => ({ ...current, entries: current.entries.filter(value => value.id !== entry.id) }));
       setSelectedId(null); setNotice('Eintrag gelöscht');
     } catch { setNotice('Löschen fehlgeschlagen'); }
   }
@@ -363,9 +382,40 @@ export default function App() {
     catch { setNotice('Änderung fehlgeschlagen'); }
   }
 
-  async function copyValue(value: string, label: string) {
-    try { await Clipboard.write({ string: value }); setNotice(label + ' kopiert'); }
-    catch { setNotice('Kopieren nicht möglich – Clipboard-Berechtigung prüfen'); }
+  async function recordActivity(entryId: string, kind: ActivityKind, fieldType?: string) {
+    try {
+      await mutateVault(current => ({ ...current, entries: current.entries.map(value =>
+        value.id === entryId ? logActivity(value, kind, fieldType) : value
+      ) }));
+    } catch { /* Analytics may never block vault actions. */ }
+  }
+
+  function openEntry(id: string) {
+    setSelectedId(id); setReveal([]);
+    void recordActivity(id, 'open');
+  }
+
+  function toggleReveal(fieldId: string, entryId: string) {
+    const wasShown = reveal.includes(fieldId);
+    setReveal(current => current.includes(fieldId) ? current.filter(id => id !== fieldId) : [...current, fieldId]);
+    if (!wasShown) void recordActivity(entryId, 'reveal');
+  }
+
+  async function copyValue(value: string, label: string, entryId?: string, fieldType?: string) {
+    try {
+      await Clipboard.write({ string: value });
+      setNotice(label + ' kopiert');
+      if (entryId) void recordActivity(entryId, 'copy', fieldType ?? label);
+    } catch { setNotice('Kopieren nicht möglich – Clipboard-Berechtigung prüfen'); }
+  }
+
+  async function clearHistory(entryId: string) {
+    try {
+      await mutateVault(current => ({ ...current, entries: current.entries.map(entry =>
+        entry.id === entryId ? { ...entry, passwordHistory: [] } : entry
+      ) }));
+      setNotice('Passwort-Historie gelöscht');
+    } catch { setNotice('Historie konnte nicht gelöscht werden'); }
   }
 
   async function toggleDevice() {
@@ -404,6 +454,7 @@ export default function App() {
       const remote = await cloudDownload();
       if (!remote) { setCloudError('Für dieses Konto ist noch kein Cloud-Tresor vorhanden.'); return; }
       if (!window.confirm('ACHTUNG: Dies ersetzt den gesamten lokalen Tresor. Nicht synchronisierte lokale Einträge gehen verloren. Fortfahren?')) return;
+      await writes.current;
       await writeLocalVault(remote);
       await disableDeviceUnlock();
       setDeviceEnabled(false);
@@ -473,16 +524,28 @@ export default function App() {
             <div><p className="eyebrow">ÜBERSICHT</p><h1>{categoryFilter || personFilter || sectionTitle}</h1>
               <p className="section-subtitle">{tab === 'settings' ? 'Sicherheit und Synchronisierung verwalten' : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
             </div>
-            {tab !== 'settings' && <button className="add-btn" type="button" onClick={() => setEditing(blankEntry())} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
+            {tab !== 'settings' && tab !== 'insights' && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
           </div>
+
+          {tab === 'vault' && <div className="quick-action-strip">
+            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={20}/> Schnell speichern</button>
+            <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={19}/> Aus Bild erkennen</button>
+          </div>}
 
           {tab === 'vault' && <div className="welcome-panel">
             <div><span className="welcome-shield"><Shield size={21}/></span><h2>Alles an einem sicheren Ort.</h2><p>Deine sensiblen Daten sind lokal verschlüsselt und nur für dich sichtbar.</p></div>
             <div className="welcome-visual"><KeyRound size={45} strokeWidth={1.5}/></div>
           </div>}
 
-          {tab !== 'settings' && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder="Passwörter, Namen, E-Mails suchen..." value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
+          {tab !== 'settings' && tab !== 'insights' && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder="Passwörter, Namen, E-Mails suchen..." value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
 
+          {tab === 'vault' && people.length > 0 && <div className="person-filter">
+            <label>Personenfilter <select value={personFilter ?? ''} onChange={e => setPersonFilter(e.target.value || null)}>
+              <option value="">Alle Personen</option>{people.map(p => <option key={p} value={p}>{p}</option>)}
+            </select></label>
+            <button type="button" className="text-btn" onClick={() => setTab('people')}>Personen anzeigen</button>
+          </div>}
+          {tab === 'insights' && <InsightsPanel data={data} onOpen={openEntry} onDeleteHistory={clearHistory}/>}
           {tab === 'categories' && !categoryFilter && <div className="collection-grid">
             {categories.length === 0 ? <div className="empty-state"><Folder size={32}/><h3>Noch keine Kategorien</h3><p>Beim Anlegen eines Eintrags kannst du mehrere Kategorien vergeben.</p></div> : categories.filter(tag => tag.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de'))).map(tag => (
               <button className="collection-card" type="button" key={tag} onClick={() => { setCategoryFilter(tag); setQuery(''); }}>
@@ -505,15 +568,15 @@ export default function App() {
             <div className="entries-list">
               {filtered.map(item => (
                 <article className="entry-card" key={item.id}>
-                  <button className="entry-open" onClick={() => { setSelectedId(item.id); setReveal([]); }} aria-label={item.title + ' öffnen'}>
+                  <button className="entry-open" onClick={() => openEntry(item.id)} aria-label={item.title + ' öffnen'}>
                     <span className="entry-avatar">{item.images[0] ? <img src={item.images[0]} alt=""/> : getInitials(item.title)}</span>
                     <span className="entry-text"><strong>{item.title}</strong><small>{item.email || item.username || item.description || 'Sicherer Eintrag'}</small>
                       <span className="mini-tags">{item.person && <em>{item.person}</em>}{item.categories.slice(0, 2).map(category => <em key={category}>{category}</em>)}</span></span>
                   </button>
                   <div className="entry-actions">
-                    <button className="icon-btn compact" type="button" title="Passwort kopieren" aria-label="Passwort kopieren" onClick={() => void copyValue(item.password, 'Passwort')} disabled={!item.password}><Copy size={19}/></button>
+                    <button className="icon-btn compact" type="button" title="Passwort kopieren" aria-label="Passwort kopieren" onClick={() => void copyValue(item.password, 'Passwort', item.id, 'Passwort')} disabled={!item.password}><Copy size={19}/></button>
                     <button className={'icon-btn compact ' + (item.favorite ? 'is-favorite' : '')} type="button" title="Favorit" aria-label="Favorit" onClick={() => void toggleFavorite(item)}><Star size={19} fill={item.favorite ? 'currentColor' : 'none'}/></button>
-                    <button className="icon-btn compact chevron" type="button" aria-label="Details" onClick={() => setSelectedId(item.id)}><ChevronRight size={19}/></button>
+                    <button className="icon-btn compact chevron" type="button" aria-label="Details" onClick={() => openEntry(item.id)}><ChevronRight size={19}/></button>
                   </div>
                 </article>
               ))}
@@ -560,7 +623,7 @@ export default function App() {
               <div className="info-panel"><ShieldCheck size={21}/><p>Freigaben werden erst aktiviert, wenn Empfängerschlüssel, Einladungen, Widerruf und Verschlüsselung vollständig umgesetzt und überprüft sind. Es werden keine Klartext-Passwörter über Links oder Firebase geteilt.</p></div>
             </section>
 
-            <p className="version-line">PassManager v0.2.0 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">PassManager v0.3.0 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
@@ -572,9 +635,9 @@ export default function App() {
           <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
           <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}</div></div>
           <div className="detail-fields">
-            {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
-            {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
-            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : '••••••••••••'}</strong><button className="icon-btn compact" onClick={() => setReveal(old => old.includes(selected.id) ? old.filter(id => id !== selected.id) : [...old, selected.id])} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
+            {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
+            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : '••••••••••••'}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
             {selected.password && selected.passwordChangedAt && <div className="detail-field"><span><CalendarClock size={16}/> Passwort vergeben / geändert</span><strong>{formatDate(selected.passwordChangedAt)}</strong></div>}
             {(selected.fields ?? []).filter(field => field.value).map(field => <div className="detail-field" key={field.id}>
               <span><KeyRound size={16}/>{field.label}</span>
@@ -582,11 +645,24 @@ export default function App() {
                 <strong className={field.kind === 'secret' || field.kind === 'pin' ? (reveal.includes(field.id) ? 'secret-text' : 'masked') : ''}>
                   {field.kind === 'secret' || field.kind === 'pin' ? (reveal.includes(field.id) ? field.value : '••••••••') : field.value}
                 </strong>
-                {(field.kind === 'secret' || field.kind === 'pin') && <button className="icon-btn compact" type="button" onClick={() => setReveal(current => current.includes(field.id) ? current.filter(id => id !== field.id) : [...current, field.id])} aria-label="Wert anzeigen">{reveal.includes(field.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
+                {(field.kind === 'secret' || field.kind === 'pin') && <button className="icon-btn compact" type="button" onClick={() => toggleReveal(field.id, selected.id)} aria-label="Wert anzeigen">{reveal.includes(field.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
                 {field.kind === 'url' && safeUrl(field.value) && <a href={safeUrl(field.value)!} target="_blank" rel="noopener noreferrer" aria-label="Link öffnen"><ExternalLink size={18}/></a>}
-                <button className="icon-btn compact" type="button" onClick={() => void copyValue(field.value, field.label)} aria-label={field.label + ' kopieren'}><Copy size={18}/></button>
+                <button className="icon-btn compact" type="button" onClick={() => void copyValue(field.value, field.label, selected.id, field.kind)} aria-label={field.label + ' kopieren'}><Copy size={18}/></button>
               </div>
             </div>)}
+            {(selected.passwordHistory ?? []).length > 0 && <div className="detail-field history-details">
+              <span><CalendarClock size={16}/> Vorherige Passwörter (verschlüsselt gespeichert)</span>
+              {(selected.passwordHistory ?? []).map((past, index) => {
+                const id = 'old-password-' + selected.id + '-' + index;
+                return <div className="historical-password" key={id}>
+                  <small>{formatDate(past.replacedAt)}</small>
+                  <strong className={reveal.includes(id) ? 'secret-text' : 'masked'}>{reveal.includes(id) ? past.value : '••••••••'}</strong>
+                  <button className="icon-btn compact" type="button" aria-label="Altes Passwort anzeigen" onClick={() => toggleReveal(id, selected.id)}>{reveal.includes(id) ? <EyeOff size={17}/> : <Eye size={17}/>}</button>
+                  <button className="icon-btn compact" type="button" aria-label="Altes Passwort kopieren" onClick={() => void copyValue(past.value, 'Altes Passwort', selected.id, 'Historie')}><Copy size={17}/></button>
+                </div>;
+              })}
+              <button className="danger-btn" type="button" onClick={() => {if(window.confirm('Alle vorherigen Passwörter dieses Eintrags unwiderruflich löschen?')) void clearHistory(selected.id);}}><Trash2 size={15}/> Historie löschen</button>
+            </div>}
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}
             {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} alt={'Anhang ' + (index + 1)}/>)}</div></div>}
@@ -596,9 +672,11 @@ export default function App() {
       </div>}
 
       {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async incoming => {
-        await persist({ ...data, entries: [...incoming, ...data.entries] });
+        await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
+      {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
+      {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
       {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} onClose={() => setEditing(null)} onSave={saveEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>

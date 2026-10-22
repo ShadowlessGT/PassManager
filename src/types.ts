@@ -9,6 +9,19 @@ export type EntryField = {
   updatedAt: number;
 };
 
+export type ActivityKind = 'open' | 'copy' | 'reveal';
+export type EntryActivity = {
+  opens: number;
+  copies: number;
+  reveals: number;
+  lastOpenedAt?: number;
+  lastUsedAt?: number;
+  fieldCopies: Record<string, number>;
+};
+export type SecretHistoryItem = {
+  value: string;
+  replacedAt: number;
+};
 export type VaultEntry = {
   id: string;
   title: string;
@@ -27,6 +40,9 @@ export type VaultEntry = {
   // Optional for compatibility with already encrypted vaults created in v0.1.
   passwordChangedAt?: number;
   fields?: EntryField[];
+  activity?: EntryActivity;
+  // Old passwords stay encrypted within the vault. Max 10 retained per entry.
+  passwordHistory?: SecretHistoryItem[];
 };
 
 export type VaultData = { version: 1; entries: VaultEntry[] };

@@ -16,6 +16,36 @@ An offline-first password vault, built with React 19, TypeScript, Vite, and Capa
 - Android FLAG_SECURE screenshot/screen-recording protection with official Capacitor Privacy Screen plugin.
 - Optional Firebase Email/Password authentication plus **manual** encrypted cloud upload/restore; no unencrypted vault values uploaded.
 
+## v0.3.0 – quick capture, encrypted insights and on-device OCR
+
+This feature branch includes:
+- **Quick Add**: short form with name, username and password. Local secure generator and optional advanced editor. Vault still saves only encrypted data.
+- **Insights**: encrypted local counters for opening an entry, copying a specific field type and revealing a secret, plus per-category distribution, most-used field types, local duplicate-password detection and a basic strength heuristic.
+- **Password history**: when replacing the main password, up to ten previous passwords are retained inside the encrypted vault. They are hidden until explicitly revealed, can be copied or cleared, and appear in the entry detail screen.
+- **Gallery / camera OCR**: choose a saved image or take a photo in Android; bundled ML Kit text recognition processes the photo on-device. Label-based extraction suggests values for name, username, email, URL, password and PIN. It **does not save automatically**: the user must review the suggestions in the editor. A temporary copy in app Cache is removed after processing. Browser OCR is explicitly unavailable.
+- Device PIN/password/biometrics remain supported as before, while the rest of the vault stays local-first.
+
+IMPORTANT: OCR can misread passwords (e.g., 0 vs O) and must not be trusted without visual verification. Screenshots stored in the phone gallery remain in the gallery until the user removes them; the app does not automatically delete source images.
+
+**No GitHub Actions.** Automated workflows have been removed at the user's request. Use local tooling:
+
+~~~sh
+npm install
+npm run build
+npm test
+node --check functions/index.js
+npx cap add android       # Only once, if Android directory doesn't already exist
+npx cap sync android
+npx cap open android
+~~~
+
+The new OCR plugin uses the locally bundled ML Kit Latin-script model and increases the APK size. This dependency has not been independently audited. Android camera/photo selection and ML Kit MUST be tested on a real device before anyone imports actual secrets.
+
+Insights note: opening an entry is counted when tapped, and a copy count records a successful clipboard write; neither proves use of the credential to sign in. The password analyzer checks only the primary password field, not PINs or custom secret fields. It performs no network leak checks, does not expose duplicates' secret values and includes only heuristic strength scores. Analytics become available only after upgrading to this release; older history cannot be reconstructed.
+
+Password histories increase the impact of any compromise of an unlocked vault. Users can clear histories from an entry or Insights. For production, offer an opt-out and add authentication before revealing old secrets. Never upload analytics or secrets unencrypted.
+
+
 ## Added in v0.2.0 (development branch)
 
 - Optional additional per-item fields, with editable label and type: text, secret, numeric PIN, number, multi-line, email or clickable website. New items start with PIN and address templates. Existing encrypted items remain readable.
