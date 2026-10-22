@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'eu.shadowlessstudios.passmanager',
   appName: 'PassManager',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: { allowMixedContent: false }
 };
 
