@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Client writes only encrypted vault envelopes; Firebase never receives secret plaintext.
+    match /vaults/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['envelope','updatedAt'])
+        && request.resource.data.envelope is map
+        && request.resource.data.envelope.keys().hasOnly(['v','iterations','salt','nonce','ciphertext','updatedAt'])
+        && request.resource.data.envelope.v == 1
+        && request.resource.data.envelope.iterations == 600000
+        && request.resource.data.envelope.salt is string
+        && request.resource.data.envelope.nonce is string
+        && request.resource.data.envelope.ciphertext is string
+        && request.resource.data.envelope.ciphertext.size() < 900000
+        && request.resource.data.updatedAt is timestamp;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
