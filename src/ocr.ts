@@ -38,7 +38,7 @@ export function parseRecognizedCredentials(text: string): OcrDraft {
     if (!known || draft[known.target]) continue;
     const candidate = clean(lines[i + 1]);
     if (!candidate || keys.some(k => k.pattern.test(candidate)) || /^[•●*]{3,}$/u.test(candidate)) continue;
-    if (known.target === 'pin' && !/^\\d{3,16}$/u.test(candidate)) continue;
+    if (known.target === 'pin' && !/^\d{3,16}$/u.test(candidate)) continue;
     draft[known.target] = candidate;
   }
   // Conservative fallback for unambiguous email and URL only. Password/PIN
