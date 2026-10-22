@@ -21,8 +21,11 @@ async function transaction<T>(mode: IDBTransactionMode, callback: (store: IDBObj
     return await new Promise<T>((resolve, reject) => {
       const tx = db.transaction(STORE, mode);
       const request = callback(tx.objectStore(STORE));
-      request.onsuccess = () => resolve(request.result);
+      let value: T;
+      request.onsuccess = () => { value = request.result; };
       request.onerror = () => reject(request.error);
+      tx.oncomplete = () => resolve(value);
+      tx.onabort = () => reject(tx.error);
       tx.onerror = () => reject(tx.error);
     });
   } finally {
