@@ -147,7 +147,15 @@ export async function loadImportFile(file: File): Promise<ImportPreview> {
   if (ext === 'csv') return rowsToVaultEntries(parseDelimited(await file.text()), file.name);
   if (ext === 'xlsx') {
     const rows = await readSheet(file);
-    return rowsToVaultEntries(rows, file.name);
+    if (!Array.isArray(rows) || !rows.every(row => Array.isArray(row))) {
+      throw new Error('Ungültige Excel-Tabellenstruktur.');
+    }
+    const safeRows = rows.map(row => row.map(cell => {
+      if (cell === null || cell === undefined || typeof cell === 'string' || typeof cell === 'number' || typeof cell === 'boolean' || cell instanceof Date)
+        return cell;
+      return String(cell);
+    }));
+    return rowsToVaultEntries(safeRows, file.name);
   }
   throw new Error('Bitte eine CSV- oder XLSX-Datei auswählen. Alte .xls-Dateien zuerst in .xlsx konvertieren.');
 }
