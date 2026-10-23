@@ -426,3 +426,17 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# PassManager build outputs
+dist/
+android/.gradle/
+android/.idea/
+android/**/build/
+android/local.properties
+android/.cxx/
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+**/*.local.log
+**/*.local.err.log
+android/gradle-local.log
+android/gradle-local.err
