@@ -5,10 +5,10 @@ import {
   Copy, Edit3, ExternalLink, Eye, EyeOff, Fingerprint, Folder,
   ImagePlus, KeyRound, LockKeyhole, LogOut, Mail, Plus, Search,
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
-  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon
+  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal
 } from 'lucide-react';
 import { blankEntry, newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
-import type { VaultData, VaultEntry, EntryField } from './types';
+import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
 import LicensePanel from './LicensePanel';
 import InsightsPanel from './InsightsPanel';
@@ -16,6 +16,12 @@ import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
 import { generateStrongPassword } from './passwordGenerator';
 import { logActivity, trackPasswordHistory } from './insights';
+import { App as NativeApp } from '@capacitor/app';
+import CategoryPicker from './CategoryPicker';
+import CategoryManager from './CategoryManager';
+import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory } from './categories';
+import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
+import type { UserPreferences } from './preferences';
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
@@ -61,15 +67,15 @@ function getInitials(title: string): string {
 
 type EditorProps = {
   entry: VaultEntry;
-  categories: string[];
+  categories: VaultCategory[];
   people: string[];
+  simple: boolean;
   onClose: () => void;
   onSave: (entry: VaultEntry) => Promise<void>;
 };
 
-function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps) {
+function EntryEditor({ entry, categories, people, simple, onClose, onSave }: EditorProps) {
   const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
-  const [categoryText, setCategoryText] = useState(draft.categories.join(', '));
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -116,7 +122,6 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.title.trim()) { setError('Bitte einen Namen eingeben.'); return; }
-    const tags = [...new Set(categoryText.split(',').map(value => value.trim()).filter(Boolean))];
     const fields = draft.fields ?? [];
     const fieldError = validateEntryFields(fields);
     if (fieldError) { setError(fieldError); return; }
@@ -126,7 +131,7 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
       await onSave({
         ...draft,
         title: draft.title.trim(),
-        categories: tags,
+        categories: draft.categories,
         person: draft.person.trim(),
         updatedAt: Date.now(),
         passwordChangedAt: draft.passwordChangedAt !== entry.passwordChangedAt
@@ -154,10 +159,10 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
         <form className="editor-form" onSubmit={submit}>
           <div className="form-section-title">Grundinformationen</div>
           <label>Name <span className="required">*</span><input autoFocus value={draft.title} onChange={e => update('title', e.target.value)} placeholder="z. B. Netflix, Gmail, WLAN..." maxLength={120}/></label>
-          <label>Beschreibung<input value={draft.description} onChange={e => update('description', e.target.value)} placeholder="Wofür wird dieser Zugang verwendet?"/></label>
+          {!simple && <label>Beschreibung<input value={draft.description} onChange={e => update('description', e.target.value)} placeholder="Wofür wird dieser Zugang verwendet?"/></label>}
           <div className="form-section-title">Zugangsdaten</div>
           <label>Benutzername<input autoComplete="off" value={draft.username} onChange={e => update('username', e.target.value)} placeholder="Benutzername"/></label>
-          <label>E-Mail-Adresse<input autoComplete="off" inputMode="email" value={draft.email} onChange={e => update('email', e.target.value)} placeholder="name@beispiel.de"/></label>
+          {!simple && <label>E-Mail-Adresse<input autoComplete="off" inputMode="email" value={draft.email} onChange={e => update('email', e.target.value)} placeholder="name@beispiel.de"/></label>}
           <label>Passwort
             <div className="field-with-actions">
               <input autoComplete="new-password" type={showPassword ? 'text' : 'password'} value={draft.password} onChange={e => update('password', e.target.value)} placeholder="Passwort"/>
@@ -165,6 +170,7 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
               <button className="field-action" type="button" title="Sicheres Passwort generieren" onClick={() => { update('password', generatePassword()); setShowPassword(true); }}><Sparkles size={19}/></button>
             </div>
           </label>
+          {!simple && <>
           <label>Homepage / URL<input value={draft.website} onChange={e => update('website', e.target.value)} placeholder="https://beispiel.de"/></label>
           <label className="check-line"><input type="checkbox" checked={Boolean(draft.keepPasswordHistory)}
             onChange={e => update('keepPasswordHistory', e.target.checked)}/>
@@ -206,9 +212,10 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
             <button type="button" className="secondary-btn" onClick={() => addField('Neues Feld', 'text')}><Plus size={17}/> Eigenes Feld</button>
           </div>}
           <div className="form-section-title">Organisieren</div>
-          <label>Person / Besitzer<input list="people-list" value={draft.person} onChange={e => update('person', e.target.value)} placeholder="z. B. Privat, Tamer, Familie"/><datalist id="people-list">{people.map(person => <option key={person} value={person}/>)}</datalist></label>
-          <label>Kategorien <span className="hint">Mehrere durch Komma trennen</span><input value={categoryText} onChange={e => setCategoryText(e.target.value)} placeholder="Arbeit, Familie, Shopping"/></label>
-          {categories.length > 0 && <div className="suggestions">{categories.slice(0, 8).map(tag => <button type="button" key={tag} className="suggestion" onClick={() => setCategoryText(previous => [...new Set([...previous.split(',').map(v => v.trim()).filter(Boolean), tag])].join(', '))}>+ {tag}</button>)}</div>}
+          <label>Person / Besitzer<input list="people-list" value={draft.person} onChange={e => update('person', e.target.value)} placeholder="z. B. Familie"/><datalist id="people-list">{people.map(person => <option key={person} value={person}/>)}</datalist></label>
+          </>}
+          <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
+          {!simple && <>
           <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>
           <div className="form-section-title">Bilder und Anhänge</div>
           <p className="input-help">Bilder werden zusammen mit dem gesamten Tresor verschlüsselt. Maximal 3 Bilder à 500 KB.</p>
@@ -217,6 +224,8 @@ function EntryEditor({ entry, categories, people, onClose, onSave }: EditorProps
             {draft.images.length < 3 && <label className="image-picker"><ImagePlus size={25}/><span>Bild hinzufügen</span><input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={addImages}/></label>}
           </div>
           <label className="check-line"><input type="checkbox" checked={draft.favorite} onChange={e => update('favorite', e.target.checked)}/><span>Zu Favoriten hinzufügen</span></label>
+          </>}
+          {simple && <p className="input-help">Tipp: Unter Einstellungen kannst du jederzeit in den Experten-Modus wechseln, um zusätzliche Felder zu bearbeiten.</p>}
           {error && <p className="error-box" role="alert">{error}</p>}
           <div className="sheet-actions">
             <button type="button" className="secondary-btn" onClick={onClose}>Abbrechen</button>
@@ -247,6 +256,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<VaultEntry | null>(null);
   const [reveal, setReveal] = useState<string[]>([]);
+  const [showExtraDetails, setShowExtraDetails] = useState(false);
   const [notice, setNotice] = useState('');
   const [cloudUser, setCloudUser] = useState<string | null>(cloudEmail());
   const [cloudLoginEmail, setCloudLoginEmail] = useState('');
@@ -256,10 +266,17 @@ export default function App() {
   const [showImporter, setShowImporter] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
   const dataRef = useRef<VaultData | null>(null);
   const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
+  useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => {
+    if (preferences.mode === 'simple' && !['vault','categories','settings'].includes(tab)) {
+      setTab('vault'); setPersonFilter(null); setCategoryFilter(null);
+    }
+  }, [preferences.mode,tab]);
 
   useEffect(() => {
     void readLocalVault().then(saved => setHasVault(Boolean(saved)))
@@ -278,33 +295,57 @@ export default function App() {
 
   function lockVault() {
     dataRef.current = null;
+    hiddenSince.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
     setShowOCR(false); setShowQuickAdd(false);
-    setSelectedId(null); setEditing(null); setReveal([]); setTab('vault');
+    setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
   }
 
   useEffect(() => {
     if (!data) return;
-    const active = () => { lastActivity.current = Date.now(); };
-    const visible = () => {
-      if (document.hidden) hiddenSince.current = Date.now();
-      else if (hiddenSince.current && Date.now() - hiddenSince.current > 15_000) lockVault();
-      else hiddenSince.current = null;
+    const noteActivity = () => { if (hiddenSince.current === null) lastActivity.current = Date.now(); };
+    const background = () => {
+      if (hiddenSince.current === null) hiddenSince.current = Date.now();
+      if (preferences.backgroundLockMs === 0) lockVault();
     };
-    const interval = window.setInterval(() => {
-      if (Date.now() - lastActivity.current > 5 * 60_000) lockVault();
-    }, 10_000);
-    window.addEventListener('pointerdown', active);
-    window.addEventListener('keydown', active);
-    document.addEventListener('visibilitychange', visible);
+    const foreground = () => {
+      const away = hiddenSince.current;
+      if (shouldLockAfterBackground(away, Date.now(), preferences.backgroundLockMs)) {
+        hiddenSince.current = null;
+        lockVault();
+      } else {
+        hiddenSince.current = null;
+        lastActivity.current = Date.now();
+      }
+    };
+    const onVisibility = () => { if (document.hidden) background(); else foreground(); };
+    const idleTimer = window.setInterval(() => {
+      // Background protection has its own separate timeout. Switching apps
+      // must never be mistaken for foreground inactivity.
+      if (hiddenSince.current === null && shouldLockAfterIdle(lastActivity.current, Date.now(), preferences.idleLockMs))
+        lockVault();
+    }, 3000);
+    window.addEventListener('pointerdown', noteActivity);
+    window.addEventListener('keydown', noteActivity);
+    document.addEventListener('visibilitychange', onVisibility);
+    let disposed = false;
+    let nativeHandle: {remove:()=>Promise<void>} | undefined;
+    void NativeApp.addListener('appStateChange', state => {
+      if (disposed) return;
+      if (state.isActive) foreground(); else background();
+    }).then(handle => { if (disposed) void handle.remove(); else nativeHandle = handle; })
+      .catch(() => { /* Browser also supports document visibility. */ });
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('pointerdown', active);
-      window.removeEventListener('keydown', active);
-      document.removeEventListener('visibilitychange', visible);
+      disposed = true;
+      void nativeHandle?.remove();
+      window.clearInterval(idleTimer);
+      window.removeEventListener('pointerdown', noteActivity);
+      window.removeEventListener('keydown', noteActivity);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [data]);
+  }, [data !== null, preferences.backgroundLockMs, preferences.idleLockMs]);
+
 
   async function gateSubmit(event: FormEvent) {
     event.preventDefault();
@@ -322,6 +363,7 @@ export default function App() {
       const derived = await deriveVaultKey(master, vaultSalt);
       const clear = stored ? await decryptVault(stored, derived) : newVault();
       if (!stored) await writeLocalVault(await encryptVault(clear, derived, vaultSalt));
+      hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(vaultSalt); setData(clear); setHasVault(true);
       setMaster(''); setConfirm(''); lastActivity.current = Date.now();
@@ -337,6 +379,7 @@ export default function App() {
       if (!stored) throw new Error('Kein Tresor vorhanden.');
       const derived = await unlockWithDevice();
       const clear = await decryptVault(stored, derived);
+      hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(stored.salt); setData(clear); lastActivity.current = Date.now();
     } catch {
@@ -366,11 +409,21 @@ export default function App() {
       const previous = current.entries.find(value => value.id === entry.id);
       existed = Boolean(previous);
       const replacement = trackPasswordHistory(previous, { ...entry, activity: previous?.activity ?? entry.activity });
-      return { ...current, entries: previous
+      const withEntry = { ...current, entries: previous
         ? current.entries.map(value => value.id === entry.id ? replacement : value)
         : [replacement, ...current.entries] };
+      return ensureEntryCategories(withEntry, replacement);
     });
     setNotice(existed ? 'Eintrag aktualisiert' : 'Eintrag verschlüsselt gespeichert');
+  }
+
+  async function saveCategory(category: VaultCategory, oldId?: string) {
+    await mutateVault(current => upsertCategory(current, category, oldId));
+    setNotice(oldId ? 'Kategorie aktualisiert' : 'Kategorie erstellt');
+  }
+  async function deleteCategory(id: string) {
+    await mutateVault(current => removeCategory(current, id));
+    setNotice('Kategorie entfernt; Einträge bleiben erhalten');
   }
 
   async function deleteEntry(entry: VaultEntry) {
@@ -395,7 +448,7 @@ export default function App() {
   }
 
   function openEntry(id: string) {
-    setSelectedId(id); setReveal([]);
+    setSelectedId(id); setReveal([]); setShowExtraDetails(false);
     void recordActivity(id, 'open');
   }
 
@@ -470,7 +523,8 @@ export default function App() {
   }
 
   const entries = data?.entries ?? [];
-  const categories = useMemo(() => [...new Set(entries.flatMap(item => item.categories))].sort((a, b) => a.localeCompare(b, 'de')), [data]);
+  const categories = useMemo(() => data ? categoriesForVault(data) : [], [data]);
+  const simple = preferences.mode === 'simple';
   const people = useMemo(() => [...new Set(entries.map(item => item.person).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')), [data]);
   const filtered = useMemo(() => entries.filter(item => {
     if (tab === 'favorites' && !item.favorite) return false;
@@ -513,12 +567,17 @@ export default function App() {
   const showEntries = tab === 'vault' || tab === 'favorites' || (tab === 'categories' && categoryFilter) || (tab === 'people' && personFilter);
 
   return (
-    <div className="app-shell">
+    <div className={simple ? 'app-shell simple-ui' : 'app-shell expert-ui'}>
       <div className="app-content">
         <header className="topbar">
           <div className="brand-line"><div className="brand-icon"><ShieldCheck size={22}/></div><div><strong>PassManager</strong><small>PERSONAL VAULT</small></div></div>
           <div className="top-actions">
             <span className="security-indicator"><span className="status-dot"/> Verschlüsselt</span>
+            <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
+              aria-label={'Zu ' + (simple ? 'Experten-Modus' : 'Einfach-Modus') + ' wechseln'}
+              onClick={() => setPreferences(old => ({...old, mode: old.mode === 'simple' ? 'expert' : 'simple'}))}>
+              <SlidersHorizontal size={15}/> {simple ? 'Einfach' : 'Experte'}
+            </button>
             <button type="button" className="icon-btn" onClick={lockVault} title="Tresor sperren" aria-label="Tresor sperren"><LockKeyhole size={20}/></button>
           </div>
         </header>
@@ -528,7 +587,7 @@ export default function App() {
             <div><p className="eyebrow">ÜBERSICHT</p><h1>{categoryFilter || personFilter || sectionTitle}</h1>
               <p className="section-subtitle">{tab === 'settings' ? 'Sicherheit und Synchronisierung verwalten' : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
             </div>
-            {tab !== 'settings' && tab !== 'insights' && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
+            {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
           </div>
 
           {tab === 'vault' && <div className="quick-action-strip">
@@ -536,27 +595,24 @@ export default function App() {
             <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={19}/> Aus Bild erkennen</button>
           </div>}
 
-          {tab === 'vault' && <div className="welcome-panel">
+          {tab === 'vault' && !simple && <div className="welcome-panel">
             <div><span className="welcome-shield"><Shield size={21}/></span><h2>Alles an einem sicheren Ort.</h2><p>Deine sensiblen Daten sind lokal verschlüsselt und nur für dich sichtbar.</p></div>
             <div className="welcome-visual"><KeyRound size={45} strokeWidth={1.5}/></div>
           </div>}
 
-          {tab !== 'settings' && tab !== 'insights' && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder="Passwörter, Namen, E-Mails suchen..." value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
+          {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites' || tab === 'people') && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder="Passwörter, Namen, E-Mails suchen..." value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
 
-          {tab === 'vault' && people.length > 0 && <div className="person-filter">
+          {tab === 'vault' && !simple && people.length > 0 && <div className="person-filter">
             <label>Personenfilter <select value={personFilter ?? ''} onChange={e => setPersonFilter(e.target.value || null)}>
               <option value="">Alle Personen</option>{people.map(p => <option key={p} value={p}>{p}</option>)}
             </select></label>
             <button type="button" className="text-btn" onClick={() => setTab('people')}>Personen anzeigen</button>
           </div>}
           {tab === 'insights' && <InsightsPanel data={data} onOpen={openEntry} onDeleteHistory={clearHistory}/>}
-          {tab === 'categories' && !categoryFilter && <div className="collection-grid">
-            {categories.length === 0 ? <div className="empty-state"><Folder size={32}/><h3>Noch keine Kategorien</h3><p>Beim Anlegen eines Eintrags kannst du mehrere Kategorien vergeben.</p></div> : categories.filter(tag => tag.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de'))).map(tag => (
-              <button className="collection-card" type="button" key={tag} onClick={() => { setCategoryFilter(tag); setQuery(''); }}>
-                <span className="collection-icon"><Folder size={22}/></span><strong>{tag}</strong><small>{entries.filter(item => item.categories.includes(tag)).length} Einträge</small><ChevronRight size={17}/>
-              </button>
-            ))}
-          </div>}
+          {tab === 'categories' && !categoryFilter && <CategoryManager
+            categories={categories} entries={entries}
+            onOpen={name => { setCategoryFilter(name); setQuery(''); }}
+            onSave={saveCategory} onDelete={deleteCategory}/>}
 
           {tab === 'people' && !personFilter && <div className="collection-grid">
             {people.length === 0 ? <div className="empty-state"><UsersRound size={32}/><h3>Noch keine Personen</h3><p>Ordne beim Anlegen eines Eintrags eine Person oder ein Profil zu.</p></div> : people.filter(person => person.toLocaleLowerCase('de').includes(query.toLocaleLowerCase('de'))).map(person => (
@@ -584,25 +640,58 @@ export default function App() {
                   </div>
                 </article>
               ))}
-              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? 'Keine Treffer gefunden' : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Lege deinen ersten verschlüsselten Eintrag an.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setEditing(blankEntry())}><Plus size={17}/> Eintrag erstellen</button>}</div>}
+              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? 'Keine Treffer gefunden' : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Erstelle einen neuen Eintrag. Du kannst ihn auch direkt einer Kategorie zuordnen.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setShowQuickAdd(true)}><Plus size={17}/> Eintrag erstellen</button>}</div>}
             </div>
           </>}
 
           {tab === 'settings' && <div className="settings-layout">
+            <section className="settings-card mode-card">
+              <div className="settings-heading"><span className="settings-icon"><SlidersHorizontal size={22}/></span>
+                <div><h2>Bedienung</h2><p>Wähle die passende Oberfläche.</p></div>
+              </div>
+              <div className="mode-choice" role="group" aria-label="Bedienmodus">
+                <button className={simple ? 'active' : ''} type="button" aria-pressed={simple}
+                  onClick={() => setPreferences(old => ({...old,mode:'simple'}))}>
+                  <strong>Einfach</strong><small>Große Schaltflächen, nur das Wichtigste</small>
+                </button>
+                <button className={!simple ? 'active' : ''} type="button" aria-pressed={!simple}
+                  onClick={() => setPreferences(old => ({...old,mode:'expert'}))}>
+                  <strong>Experte</strong><small>Zusatzfelder, Analysen und erweiterte Optionen</small>
+                </button>
+              </div>
+              <p className="settings-note">Die Wahl ändert nur die Darstellung. Gespeicherte Zugangsdaten bleiben immer erhalten.</p>
+            </section>
+            {!simple && <>
             <LicensePanel/>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span><div><h2>Passwörter importieren</h2><p>CSV und Excel (.xlsx) von anderen Passwort-Managern und Tabellen.</p></div></div>
               <p className="settings-note">Import ausschließlich auf diesem Gerät, keine Uploads. Vor dem Speichern werden Dubletten geprüft. Bitte unverschlüsselte Quelldatei nach dem Import sicher entfernen.</p>
               <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}><ArrowDownToLine size={17}/> Import-Assistent öffnen</button>
             </section>
+            </>}
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
               <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
               {!deviceSupported && <p className="settings-note">Diese Funktion ist in der installierten Android-App mit eingerichteter Gerätesperre verfügbar.</p>}
-              <div className="settings-row"><div><strong>Automatische Sperre</strong><small>Nach 5 Minuten Inaktivität oder längerer Hintergrundzeit</small></div><span className="state-text">Aktiv</span></div>
+              <div className="setting-timeouts">
+                <label>Wenn die App im Hintergrund ist
+                  <select aria-label="Sperrzeit im Hintergrund" value={preferences.backgroundLockMs}
+                    onChange={event => setPreferences(old => ({...old,backgroundLockMs:Number(event.target.value)}))}>
+                    {LOCK_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label>Wenn die App geöffnet, aber unbenutzt ist
+                  <select aria-label="Sperrzeit bei Inaktivität" value={preferences.idleLockMs}
+                    onChange={event => setPreferences(old => ({...old,idleLockMs:Number(event.target.value)}))}>
+                    {IDLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <p className="settings-note">Kurzes Wechseln zu einer anderen App erfordert nicht sofort eine neue Anmeldung. Nach einem vollständigen Neustart oder wenn Android den Prozess beendet, ist weiterhin eine sichere Entsperrung nötig.</p>
+              </div>
               <button className="outline-btn" type="button" onClick={lockVault}><LogOut size={17}/> Tresor jetzt sperren</button>
             </section>
 
+            {!simple && <>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon cloud"><Cloud size={22}/></span><div><h2>Firebase Cloud-Backup</h2><p>Optional – nur verschlüsselte Tresordaten werden übertragen.</p></div></div>
               {!cloudConfigured ? <div className="info-panel"><Cloud size={19}/><p>Firebase ist vorbereitet, aber noch nicht eingerichtet. Trage die Werte aus <code>.env.example</code> in <code>.env.local</code> ein und aktiviere Firebase Authentication (E-Mail/Passwort) und Firestore.</p></div> : cloudUser ? <>
@@ -627,12 +716,13 @@ export default function App() {
               <div className="info-panel"><ShieldCheck size={21}/><p>Freigaben werden erst aktiviert, wenn Empfängerschlüssel, Einladungen, Widerruf und Verschlüsselung vollständig umgesetzt und überprüft sind. Es werden keine Klartext-Passwörter über Links oder Firebase geteilt.</p></div>
             </section>
 
-            <p className="version-line">PassManager v0.3.0 · Shadowless Studios · Offline-first</p>
+            </>}
+            <p className="version-line">PassManager v0.4.0 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
 
-      <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{item.label}</span></button>; })}</nav>
+      <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.filter(item => !simple || ['vault','categories','settings'].includes(item.id)).map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{item.label}</span></button>; })}</nav>
 
       {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
@@ -642,6 +732,10 @@ export default function App() {
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
             {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : '••••••••••••'}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            {simple && <button type="button" className="secondary-btn show-more-entry" onClick={() => setShowExtraDetails(value => !value)}>
+              {showExtraDetails ? 'Weniger anzeigen' : 'Weitere Informationen anzeigen'}
+            </button>}
+            {(!simple || showExtraDetails) && <>
             {selected.password && selected.passwordChangedAt && <div className="detail-field"><span><CalendarClock size={16}/> Passwort vergeben / geändert</span><strong>{formatDate(selected.passwordChangedAt)}</strong></div>}
             {(selected.fields ?? []).filter(field => field.value).map(field => <div className="detail-field" key={field.id}>
               <span><KeyRound size={16}/>{field.label}</span>
@@ -670,6 +764,7 @@ export default function App() {
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}
             {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} alt={'Anhang ' + (index + 1)}/>)}</div></div>}
+            </>}
           </div>
           <div className="detail-footer"><span>Aktualisiert am {formatDate(selected.updatedAt)}</span><button className="danger-btn" type="button" onClick={() => void deleteEntry(selected)}><Trash2 size={16}/> Löschen</button></div>
         </section>
@@ -679,9 +774,9 @@ export default function App() {
         await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
-      {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
+      {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
-      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} onClose={() => setEditing(null)} onSave={saveEntry}/>}
+      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} onClose={() => setEditing(null)} onSave={saveEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>
   );

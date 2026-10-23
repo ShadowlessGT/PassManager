@@ -46,7 +46,15 @@ export type VaultEntry = {
   keepPasswordHistory?: boolean;
 };
 
-export type VaultData = { version: 1; entries: VaultEntry[] };
+export type VaultCategory = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+};
+// Category registry is optional to preserve full compatibility with existing vaults.
+// A category never has credentials of its own.
+export type VaultData = { version: 1; entries: VaultEntry[]; categories?: VaultCategory[] };
 export const newVault = (): VaultData => ({ version: 1, entries: [] });
 
 export const makeField = (label: string, kind: FieldKind = 'text', value = ''): EntryField => ({

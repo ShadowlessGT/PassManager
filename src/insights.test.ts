@@ -26,6 +26,11 @@ describe('local and private vault insights', () => {
     entry = logActivity(entry, 'copy', 'PIN', 200);
     expect(entry.activity).toMatchObject({ opens:1, copies:1, lastOpenedAt:100, fieldCopies:{ PIN:1 } });
   });
+  it('shows empty categories even without any entry', () => {
+    const blank = { ...newVault(), categories: [{ id:'folder', name:'Router',color:'#927BF5',icon:'wifi' }] };
+    const summary = calculateInsights(blank);
+    expect(summary.categories).toEqual([{name:'Router',count:0}]);
+  });
   it('never treats short numeric passwords as strong', () => {
     expect(passwordStrength('1234')).toBe('weak');
     expect(passwordStrength('')).toBe('missing');

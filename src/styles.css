@@ -299,3 +299,70 @@ h1, h2, h3, p { margin-top: 0; }
   .quick-action-strip { margin-top:0; }
   .quick-primary,.quick-secondary { min-width:145px; padding:11px; font-size:11px; }
 }
+
+
+/* PassManager v0.4 – large-target simple UX, category folders and lock controls. */
+.mode-switch { border:1px solid #515279; border-radius:30px; background:#27293f; color:#ddd4ff; padding:8px 12px; display:inline-flex; gap:7px; align-items:center; font-weight:750; cursor:pointer; }
+.mode-switch:hover { background:#363453; }
+.mode-choice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.mode-choice button { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:8px; padding:17px; background:#1c2636; color:#d6def0; border:1px solid #454b65; border-radius:14px; cursor:pointer; }
+.mode-choice button.active { border:2px solid #a992ff; padding:16px; background:#302a4e; }
+.mode-choice button strong { font-size:16px; color:#f7f6ff; }
+.mode-choice button small { font-size:11px; color:#a7b5cb; line-height:1.5; }
+.setting-timeouts { display:grid; gap:18px; margin:18px 0; }
+.setting-timeouts label { display:grid; gap:9px; font-size:14px; font-weight:700; color:#e8e6fb; }
+.setting-timeouts select { border:1px solid #555978; border-radius:12px; padding:14px; font:inherit; background:#1b2535; color:#f5f2ff; min-height:49px; width:100%; }
+.category-manager { display:grid; gap:16px; }
+.category-manager-intro { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:10px 0; }
+.category-manager-intro h2 { font-size:18px; margin:0 0 5px; }
+.category-manager-intro p { font-size:12px; line-height:1.65; color:#a5b4cc; max-width:480px; margin:0; }
+.category-manager-card { display:flex; align-items:center; background:#1d2536; border:1px solid #38435a; border-radius:15px; overflow:hidden; min-height:90px; }
+.category-manager-card .category-view-btn { flex:1; display:grid; grid-template-columns:46px minmax(0,1fr); grid-template-rows:auto auto; align-content:center; column-gap:12px; text-align:left; background:transparent; color:inherit; border:0; cursor:pointer; padding:15px; min-height:90px; }
+.category-large-icon { grid-row:1/span 2; border-radius:13px; width:46px; height:46px; display:flex; align-items:center; justify-content:center; }
+.category-view-btn strong { font-size:15px; overflow-wrap:anywhere; }
+.category-view-btn small { color:#a4b3cb; font-size:12px; margin-top:5px; }
+.category-edit-btn { flex-shrink:0; margin:10px; min-width:36px; min-height:36px; }
+.category-icons { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; }
+.category-icons button { color:#d8d6ec; background:#222a3c; border:1px solid #3c4860; border-radius:12px; height:48px; display:grid; place-items:center; cursor:pointer; }
+.category-icons button.chosen { color:#fff; border:2px solid #ac94ff; background:#463d72; }
+.category-colors { display:flex; gap:11px; flex-wrap:wrap; }
+.category-colors button { width:40px; height:40px; border-radius:50%; border:2px solid transparent; display:grid; place-items:center; cursor:pointer; }
+.category-colors button.selected { outline:2px solid #fff; outline-offset:3px; }
+.category-colors button span { display:grid; place-items:center; color:white; }
+.category-picker { display:grid; gap:12px; padding:14px; border:1px solid #39455b; background:#171f30; border-radius:14px; }
+.category-picker.compact { padding:12px; }
+.category-picker .field-label { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px; font-size:14px; }
+.category-picker .field-label small { color:#a6b2ca; font-size:11px; font-weight:500; }
+.category-chip-grid { display:flex; flex-wrap:wrap; gap:9px; }
+.category-chip { border:1px solid #515777; background:#282e45; color:#dddff2; padding:10px 14px; border-radius:30px; display:inline-flex; align-items:center; gap:7px; min-height:44px; cursor:pointer; font-size:13px; font-weight:650; }
+.category-chip.chosen { border-color:#ae97ff; background:#463c6a; color:#fff; }
+.category-chip-dot { border-radius:50%; display:block; width:10px; height:10px; flex-shrink:0; }
+.category-chip.category-add { border-style:dashed; color:#baaaff; background:transparent; }
+.category-inline-create { display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
+.category-inline-create input { min-width:0; flex:1; padding:12px; border:1px solid #515777; border-radius:10px; background:#111827; color:#fff; }
+.category-edit-sheet { max-width:470px; }
+/* On mobile, favor large and legible touch targets in Simple mode. */
+.app-shell:has(.mode-switch) .quick-action-strip button { min-height:48px; }
+@media (max-width:650px) {
+  .compact-switch { padding:8px 10px; font-size:11px; }
+  .security-indicator { display:none; }
+  .category-manager-intro .secondary-btn { min-height:44px; }
+  .mode-choice button { padding:13px; }
+  .mode-choice button.active { padding:12px; }
+  .category-icons { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .category-manager-card .category-view-btn { min-height:85px; }
+}
+
+/* Comfortable reading and actions in Simple mode */
+.simple-ui .entry-text strong { font-size:16px; }
+.simple-ui .entry-text small { font-size:13px; }
+.simple-ui .entry-card { min-height:78px; }
+.simple-ui .entry-open { min-height:70px; }
+.simple-ui .bottom-nav .nav-item span { font-size:12px; }
+.simple-ui .bottom-nav .nav-item { min-height:60px; }
+.simple-ui .category-manager-card strong { font-size:16px; }
+.simple-ui .category-manager-card small { font-size:13px; }
+.simple-ui .editor-form input,.simple-ui .editor-form select,.simple-ui .editor-form textarea { font-size:16px; }
+.simple-ui .quick-primary,.simple-ui .quick-secondary { font-size:14px; font-weight:750; }
+.simple-ui .editor-form .primary-btn { min-height:50px; }
+.show-more-entry { margin:8px 0 14px; min-height:44px; }

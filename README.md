@@ -16,6 +16,19 @@ An offline-first password vault, built with React 19, TypeScript, Vite, and Capa
 - Android FLAG_SECURE screenshot/screen-recording protection with official Capacitor Privacy Screen plugin.
 - Optional Firebase Email/Password authentication plus **manual** encrypted cloud upload/restore; no unencrypted vault values uploaded.
 
+## v0.4.0 – Simple/Expert UX and configurable auto-lock
+
+- **Simple mode** is the new default: large, clear actions, fast name/username/password entry and an optional category picker. Extra fields, image attachments, Insights, sharing and advanced settings remain available in Expert mode. Switching modes does not delete or transform vault entries. UI mode is a device-local preference, not a change to the encrypted vault schema.
+- **Two independent local lock timers**, editable under Settings → Unlock: how long the unlocked app may remain in the background (immediate / 1 / 5 / 10 / 15 / 30 / 60 minutes) and how long it may stay idle while open (1 / 5 / 10 / 15 / 30 / 60 minutes). Defaults: **5-minute background**, **15-minute foreground idle**. Persisted preference contains no secret. Native Capacitor App lifecycle events and document visibility changes cover Android and web. Explicit Lock always acts immediately. An OS-killed process cannot safely retain an in-memory master key; relaunch requires biometric or master-password unlock.
+- **Categories are independent folders/labels**: create an empty category without creating a password, choose an icon and color, and assign a category by tapping a chip in Quick Add or the entry editor. Renaming updates all assignments; deleting removes only the label, **never** the credentials. Legacy vaults with string-only categories are supported without destructive migrations. New/edited entries register new labels in the encrypted vault.
+- Android's app package is versionCode 4, versionName 0.4.0 so a debug build can be installed over v0.3.0 when signed with the same debug key.
+- **No GitHub Actions** or workflow runs. For testing and building, use \`BUILD_ANDROID.cmd\` through the owner's authorized local Bridge or run it on their Windows PC. Install dependencies with \`npm install\`, run \`npm run build\` and \`npm test\`, then \`npx cap sync android\` followed by Gradle \`assembleDebug\`. This version adds \`@capacitor/app\` for native lifecycle notifications.
+
+### Important security behavior
+
+An unlocked vault keeps the encryption key in memory until explicitly or automatically locked. Extending the background timeout increases the opportunity for unauthorized access while the device is unlocked. Default timeouts are conservative, and a longer background duration is an explicit user choice. These settings are local-only; passwords and category metadata are part of the encrypted vault. After force-stop, reboot or process eviction, reopening must still require secure authentication. Test app switching, app kill, device lock and biometric unlock with **dummy credentials** on a real Android device.
+
+
 ## v0.3.0 – quick capture, encrypted insights and on-device OCR
 
 This feature branch includes:

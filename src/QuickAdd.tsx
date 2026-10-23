@@ -4,20 +4,25 @@ import { Check, Eye, EyeOff, KeyRound, Pencil, Sparkles, X } from 'lucide-react'
 import { blankEntry } from './types';
 import type { VaultEntry } from './types';
 import { generateStrongPassword } from './passwordGenerator';
+import CategoryPicker from './CategoryPicker';
+import type { VaultCategory } from './types';
 
-export default function QuickAdd({ onClose, onSave, onAdvanced }: {
+export default function QuickAdd({ onClose, onSave, onAdvanced, categories, initialCategories = [] }: {
   onClose: () => void;
   onSave: (entry: VaultEntry) => Promise<void>;
   onAdvanced: (entry: VaultEntry) => void;
+  categories: VaultCategory[];
+  initialCategories?: string[];
 }) {
   const [title, setTitle] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategories);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   function entry(): VaultEntry {
-    return { ...blankEntry(), title: title.trim(), username: username.trim(), password,
+    return { ...blankEntry(), title: title.trim(), username: username.trim(), password, categories: selectedCategories,
       passwordChangedAt: password ? Date.now() : undefined };
   }
   async function submit(event: FormEvent) {
@@ -40,6 +45,7 @@ export default function QuickAdd({ onClose, onSave, onAdvanced }: {
           <button type="button" className="icon-btn" onClick={() => setVisible(!visible)} title="Passwort anzeigen">{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
           <button type="button" className="icon-btn" onClick={() => { setPassword(generateStrongPassword()); setVisible(true); }} title="Sicheres Passwort erstellen"><Sparkles size={18}/></button>
         </div></label>
+        <CategoryPicker compact available={categories} selected={selectedCategories} onChange={setSelectedCategories}/>
         {error && <p className="error-box" role="alert">{error}</p>}
         <div className="sheet-actions"><button type="button" className="secondary-btn" onClick={() => { onAdvanced(entry()); onClose(); }}><Pencil size={16}/> Mehr Felder</button><button type="submit" className="primary-btn" disabled={busy}><Check size={17}/> Sicher speichern</button></div>
       </form>

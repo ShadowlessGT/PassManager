@@ -75,6 +75,7 @@ function count(map: Map<string, number>, key: string, increment = 1) {
 export function calculateInsights(vault: VaultData): VaultInsights {
   const entries = vault.entries;
   const categories = new Map<string, number>();
+  for (const folder of vault.categories ?? []) categories.set(folder.name, 0);
   const fieldTypes = new Map<string, number>();
   const copiedFields = new Map<string, number>();
   const passwords = new Map<string, string[]>();
