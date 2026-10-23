@@ -7,7 +7,7 @@ import {
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
   X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal
 } from 'lucide-react';
-import { blankEntry, newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
+import { newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
 import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
 import LicensePanel from './LicensePanel';
