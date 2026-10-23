@@ -5,7 +5,8 @@ Set-Location $root
 $studio='C:\Program Files\Android\Android Studio\bin\studio64.exe'
 $jbr='C:\Program Files\Android\Android Studio\jbr'
 $sdk=Join-Path $env:LOCALAPPDATA 'Android\Sdk'
-$destination='H:\Meine Ablage\Sharing\APKs\PassManager-v0.3.0-debug.apk'
+$appVersion=(Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
+$destination=Join-Path 'H:\Meine Ablage\Sharing\APKs' ("PassManager-v" + $appVersion + "-debug.apk")
 function Stage([string]$name,[scriptblock]$action){
   Write-Host ('['+(Get-Date -Format 'HH:mm:ss')+'] '+$name)
   & $action
