@@ -568,7 +568,7 @@ export default function App() {
               <input type={showMaster ? 'text' : 'password'} autoComplete="new-password" value={confirm}
                 onChange={e => setConfirm(e.target.value)} placeholder="Dasselbe Passwort erneut eingeben"/>
             </label>
-          </>
+          </>}
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? 'Tresor entsperren' : 'Sicheren Tresor erstellen'} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
