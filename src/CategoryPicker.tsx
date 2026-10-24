@@ -15,7 +15,7 @@ export default function CategoryPicker({available,selected,onChange,compact=fals
   const choices = [...available];
   for (const value of selected) {
     if (!choices.some(item => categoryKey(item.name) === categoryKey(value)))
-      choices.push({id:'draft-'+value,name:value,icon:'folder',color:'#927BF5'});
+      choices.push({id:'draft-'+value,name:value,icon:'folder',color:'#4F9FA5'});
   }
   function choose(name: string) {
     const exists = selected.some(item => categoryKey(item) === categoryKey(name));

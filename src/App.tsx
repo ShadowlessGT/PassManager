@@ -15,6 +15,7 @@ import InsightsPanel from './InsightsPanel';
 import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
 import { generateStrongPassword } from './passwordGenerator';
+import { validateNewMasterPassword, masterPasswordStrength } from './masterPassword';
 import { logActivity, trackPasswordHistory } from './insights';
 import { App as NativeApp } from '@capacitor/app';
 import CategoryPicker from './CategoryPicker';
@@ -245,6 +246,7 @@ export default function App() {
   const [salt, setSalt] = useState('');
   const [master, setMaster] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showMaster, setShowMaster] = useState(false);
   const [gateError, setGateError] = useState('');
   const [working, setWorking] = useState(false);
   const [deviceSupported, setDeviceSupported] = useState(false);
@@ -351,9 +353,9 @@ export default function App() {
     event.preventDefault();
     setGateError('');
     if (!master) { setGateError('Master-Passwort eingeben.'); return; }
-    if (!hasVault && (master.length < 12 || master !== confirm)) {
-      setGateError(master.length < 12 ? 'Mindestens 12 Zeichen für das Master-Passwort verwenden.' : 'Passwörter stimmen nicht überein.');
-      return;
+    if (!hasVault) {
+      const setupError = validateNewMasterPassword(master, confirm);
+      if (setupError) { setGateError(setupError); return; }
     }
     setWorking(true);
     try {
@@ -543,21 +545,36 @@ export default function App() {
       <div className="lock-glow"/>
       <section className="lock-card">
         <div className="brand-icon large"><ShieldCheck size={35}/></div>
-        <p className="eyebrow">DEIN PRIVATER TRESOR</p>
-        <h1>Deine Passwörter.<br/><span>Deine Kontrolle.</span></h1>
-        <p className="lock-intro">Ein sicherer Ort für all deine Zugangsdaten, Bilder und persönlichen Notizen.</p>
-        <div className="lock-pill"><LockKeyhole size={15}/> AES-256-GCM · Lokal verschlüsselt</div>
+        <p className="eyebrow">PASSMANAGER</p>
+        <h1>{hasVault ? <>Dein Tresor.<br/><span>Sicher geschützt.</span></> : <>Deine Passwörter.<br/><span>Einfach aufbewahrt.</span></>}</h1>
+        <p className="lock-intro">{hasVault
+          ? 'Öffne deinen Tresor mit deinem Passwort oder deinem Fingerabdruck.'
+          : 'Lege jetzt ein Passwort für deinen persönlichen Tresor fest. Damit bleiben deine gespeicherten Zugänge geschützt.'}</p>
+        <div className="lock-pill"><LockKeyhole size={15}/> Deine Daten werden verschlüsselt gespeichert</div>
         <form className="gate-form" onSubmit={gateSubmit}>
-          <label>Master-Passwort
-            <input type="password" autoComplete={hasVault ? 'current-password' : 'new-password'} value={master} onChange={e => setMaster(e.target.value)} placeholder={hasVault ? 'Tresor entsperren' : 'Mindestens 12 Zeichen'} />
+          <label>{hasVault ? 'Dein Tresor-Passwort' : 'Passwort für deinen Tresor'}
+            <span className="master-password-control">
+              <input type={showMaster ? 'text' : 'password'} autoComplete={hasVault ? 'current-password' : 'new-password'}
+                value={master} onChange={e => setMaster(e.target.value)}
+                placeholder={hasVault ? 'Passwort eingeben' : 'Ab 6 Zeichen möglich'} />
+              <button type="button" className="master-visibility" onClick={() => setShowMaster(value => !value)}
+                aria-label={showMaster ? 'Passwort verbergen' : 'Passwort anzeigen'}>{showMaster ? <EyeOff size={19}/> : <Eye size={19}/>}</button>
+            </span>
           </label>
-          {!hasVault && <label>Master-Passwort wiederholen<input type="password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Passwort bestätigen"/></label>}
+          {!hasVault && <>
+            <p className="master-advice"><ShieldCheck size={18}/> <span><strong>Empfohlen: 12 Zeichen oder mehr.</strong> Mindestens 6 Zeichen sind erlaubt. Ein kurzes Passwort ist leichter zu erraten.</span></p>
+            {master && masterPasswordStrength(master) === 'below-recommendation' && <p className="master-warning" role="status">Das Passwort ist zulässig, aber weniger sicher. Für den Schutz aller Zugänge lieber ein längeres wählen.</p>}
+            <label>Passwort zur Kontrolle wiederholen
+              <input type={showMaster ? 'text' : 'password'} autoComplete="new-password" value={confirm}
+                onChange={e => setConfirm(e.target.value)} placeholder="Dasselbe Passwort erneut eingeben"/>
+            </label>
+          </>
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? 'Tresor entsperren' : 'Sicheren Tresor erstellen'} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
-        {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck, Gesicht oder Gerätesperre öffnen</button>}
-        <LicensePanel compact/>
-        <p className="lock-footnote">{hasVault ? 'Dein Master-Passwort verlässt dieses Gerät nicht.' : 'Wichtig: Ohne Master-Passwort ist dein Tresor nicht wiederherstellbar. Bewahre es sicher auf.'}</p>
+        {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck öffnen</button>}
+        {hasVault && <LicensePanel compact/>}
+        <p className="lock-footnote">{hasVault ? 'Dein Tresor-Passwort bleibt auf deinem Gerät.' : 'Wichtig: Schreibe dir dein Tresor-Passwort an einem sicheren Ort auf. Ohne dieses Passwort sind die Daten nicht wiederherstellbar.'}</p>
       </section>
       <footer className="lock-footer">PassManager · by Shadowless Studios</footer>
     </main>
@@ -584,15 +601,17 @@ export default function App() {
 
         <main>
           <div className="section-head">
-            <div><p className="eyebrow">ÜBERSICHT</p><h1>{categoryFilter || personFilter || sectionTitle}</h1>
-              <p className="section-subtitle">{tab === 'settings' ? 'Sicherheit und Synchronisierung verwalten' : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
+            <div><p className="eyebrow">{simple ? 'MEINE PASSWÖRTER' : 'ÜBERSICHT'}</p><h1>{categoryFilter || personFilter || sectionTitle}</h1>
+              <p className="section-subtitle">{tab === 'settings' ? (simple ? 'So funktioniert dein Tresor' : 'Sicherheit und Synchronisierung verwalten') : simple
+                ? (tab === 'categories' ? 'Finde deine Zugänge in übersichtlichen Ordnern.' : entries.length + ' ' + (entries.length === 1 ? 'gespeicherter Zugang' : 'gespeicherte Zugänge'))
+                : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
             </div>
             {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
           </div>
 
           {tab === 'vault' && <div className="quick-action-strip">
-            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={20}/> Schnell speichern</button>
-            <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={19}/> Aus Bild erkennen</button>
+            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={22}/> {simple ? 'Neues Passwort speichern' : 'Schnell speichern'}</button>
+            <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> {simple ? 'Daten aus Foto übernehmen' : 'Aus Bild erkennen'}</button>
           </div>}
 
           {tab === 'vault' && !simple && <div className="welcome-panel">
@@ -600,7 +619,7 @@ export default function App() {
             <div className="welcome-visual"><KeyRound size={45} strokeWidth={1.5}/></div>
           </div>}
 
-          {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites' || tab === 'people') && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder="Passwörter, Namen, E-Mails suchen..." value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
+          {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites' || tab === 'people') && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder={simple ? 'Nach einem Zugang suchen …' : 'Passwörter, Namen, E-Mails suchen...'} value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
 
           {tab === 'vault' && !simple && people.length > 0 && <div className="person-filter">
             <label>Personenfilter <select value={personFilter ?? ''} onChange={e => setPersonFilter(e.target.value || null)}>
@@ -624,23 +643,28 @@ export default function App() {
 
           {showEntries && <>
             {(categoryFilter || personFilter) && <button className="back-filter" type="button" onClick={() => { setCategoryFilter(null); setPersonFilter(null); }}><ArrowLeft size={16}/> Alle {categoryFilter ? 'Kategorien' : 'Personen'}</button>}
-            <div className="list-title"><h2>{tab === 'favorites' ? 'Markierte Einträge' : categoryFilter || personFilter ? 'Zugeordnete Einträge' : 'Deine Einträge'}</h2><span>{filtered.length}</span></div>
+            <div className="list-title"><h2>{tab === 'favorites' ? 'Markierte Einträge' : categoryFilter || personFilter ? 'Einträge in diesem Ordner' : simple ? 'Gespeicherte Zugänge' : 'Deine Einträge'}</h2><span>{filtered.length}</span></div>
             <div className="entries-list">
               {filtered.map(item => (
                 <article className="entry-card" key={item.id}>
                   <button className="entry-open" onClick={() => openEntry(item.id)} aria-label={item.title + ' öffnen'}>
                     <span className="entry-avatar">{item.images[0] ? <img src={item.images[0]} alt=""/> : getInitials(item.title)}</span>
-                    <span className="entry-text"><strong>{item.title}</strong><small>{item.email || item.username || item.description || 'Sicherer Eintrag'}</small>
+                    <span className="entry-text"><strong>{item.title}</strong><small>{item.email || item.username || item.description || (simple ? 'Zum Öffnen antippen' : 'Sicherer Eintrag')}</small>
                       <span className="mini-tags">{item.person && <em>{item.person}</em>}{item.categories.slice(0, 2).map(category => <em key={category}>{category}</em>)}</span></span>
                   </button>
                   <div className="entry-actions">
-                    <button className="icon-btn compact" type="button" title="Passwort kopieren" aria-label="Passwort kopieren" onClick={() => void copyValue(item.password, 'Passwort', item.id, 'Passwort')} disabled={!item.password}><Copy size={19}/></button>
-                    <button className={'icon-btn compact ' + (item.favorite ? 'is-favorite' : '')} type="button" title="Favorit" aria-label="Favorit" onClick={() => void toggleFavorite(item)}><Star size={19} fill={item.favorite ? 'currentColor' : 'none'}/></button>
+                    {simple ? <button className="simple-copy-btn" type="button" aria-label={'Passwort für '+item.title+' kopieren'}
+                      onClick={() => void copyValue(item.password, 'Passwort', item.id, 'Passwort')} disabled={!item.password}>
+                      <Copy size={19}/> Kopieren
+                    </button> :
+                    <button className="icon-btn compact" type="button" title="Passwort kopieren" aria-label="Passwort kopieren"
+                      onClick={() => void copyValue(item.password, 'Passwort', item.id, 'Passwort')} disabled={!item.password}><Copy size={19}/></button>}
+                    {!simple && <button className={'icon-btn compact ' + (item.favorite ? 'is-favorite' : '')} type="button" title="Favorit" aria-label="Favorit" onClick={() => void toggleFavorite(item)}><Star size={19} fill={item.favorite ? 'currentColor' : 'none'}/></button>}
                     <button className="icon-btn compact chevron" type="button" aria-label="Details" onClick={() => openEntry(item.id)}><ChevronRight size={19}/></button>
                   </div>
                 </article>
               ))}
-              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? 'Keine Treffer gefunden' : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Erstelle einen neuen Eintrag. Du kannst ihn auch direkt einer Kategorie zuordnen.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setShowQuickAdd(true)}><Plus size={17}/> Eintrag erstellen</button>}</div>}
+              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? 'Keine Treffer gefunden' : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Tippe auf „Neues Passwort speichern“, um deinen ersten Zugang anzulegen.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setShowQuickAdd(true)}><Plus size={17}/> Passwort speichern</button>}</div>}
             </div>
           </>}
 
@@ -652,11 +676,11 @@ export default function App() {
               <div className="mode-choice" role="group" aria-label="Bedienmodus">
                 <button className={simple ? 'active' : ''} type="button" aria-pressed={simple}
                   onClick={() => setPreferences(old => ({...old,mode:'simple'}))}>
-                  <strong>Einfach</strong><small>Große Schaltflächen, nur das Wichtigste</small>
+                  <strong>Einfach</strong><small>Wenige Schritte und gut lesbare Texte</small>
                 </button>
                 <button className={!simple ? 'active' : ''} type="button" aria-pressed={!simple}
                   onClick={() => setPreferences(old => ({...old,mode:'expert'}))}>
-                  <strong>Experte</strong><small>Zusatzfelder, Analysen und erweiterte Optionen</small>
+                  <strong>Experte</strong><small>Alle Funktionen und weitere Einstellungen</small>
                 </button>
               </div>
               <p className="settings-note">Die Wahl ändert nur die Darstellung. Gespeicherte Zugangsdaten bleiben immer erhalten.</p>
@@ -717,7 +741,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">PassManager v0.4.0 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">PassManager v0.5.0 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
@@ -774,7 +798,7 @@ export default function App() {
         await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
-      {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
+      {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} simple={simple} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
       {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} onClose={() => setEditing(null)} onSave={saveEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}

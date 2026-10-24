@@ -16,6 +16,17 @@ An offline-first password vault, built with React 19, TypeScript, Vite, and Capa
 - Android FLAG_SECURE screenshot/screen-recording protection with official Capacitor Privacy Screen plugin.
 - Optional Firebase Email/Password authentication plus **manual** encrypted cloud upload/restore; no unencrypted vault values uploaded.
 
+## v0.5.0 – Accessible Simple mode, neutral dark design, six-character minimum
+
+- **New vault creation** accepts a master password of at least **6 characters** (was 12), while prominently recommending **12+ characters** and warning in the setup form about the higher risk of short master passwords. The two confirmation fields must still match. This does not weaken the existing PBKDF2/AES-256-GCM encryption format, but shorter human-chosen master passwords are significantly easier to guess if encrypted vault data are obtained.
+- Existing vaults remain compatible; the policy is applied to **new vault setup**, not unlocking an existing vault.
+- **Simpler initial setup**: familiar German language, ability to show/hide the password, readable explanation and unobtrusive guidance.
+- **Simple mode designed for nontechnical/older users**: larger touch targets, obvious copy button labels, three clear form steps, optional categories hidden until requested, readable font sizes, prominent "Neues Passwort speichern" button. Switching to Expert mode retains full editing, fields and analytics.
+- **True dark theme**: charcoal/neutral surfaces with a restrained teal-gray accent instead of purple glows and violet highlights. Individually selected category colors remain supported.
+- **No GitHub Actions**. Run local npm, Vitest, Capacitor/Gradle via authorized owner Bridge / Android Studio and place a debug test APK in \`H:\\Meine Ablage\\Sharing\\APKs\`.
+
+**Security:** 6-character master passwords are *allowed*, not *recommended*. Users should favor a unique 12+ character password or long passphrase and use biometric unlock for convenience. Cloud sync with Google/OneDrive is a separately tracked future feature, not part of this build.
+
 ## v0.4.0 – Simple/Expert UX and configurable auto-lock
 
 - **Simple mode** is the new default: large, clear actions, fast name/username/password entry and an optional category picker. Extra fields, image attachments, Insights, sharing and advanced settings remain available in Expert mode. Switching modes does not delete or transform vault entries. UI mode is a device-local preference, not a change to the encrypted vault schema.

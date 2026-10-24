@@ -1,6 +1,6 @@
 import type { VaultCategory, VaultData, VaultEntry } from './types';
 
-export const CATEGORY_COLORS = ['#927BF5','#3DADAC','#E9A65D','#E0718C','#7599E8','#94AB63','#A1A8BB'] as const;
+export const CATEGORY_COLORS = ['#4F9FA5','#6A96B8','#CDA66A','#C47B85','#78957D','#879FA5','#A1A8BB'] as const;
 export const CATEGORY_ICONS = [
   { value:'folder', label:'Ordner' }, { value:'home', label:'Zuhause' },
   { value:'briefcase', label:'Arbeit' }, { value:'wallet', label:'Finanzen' },
