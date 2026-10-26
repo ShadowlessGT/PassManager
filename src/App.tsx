@@ -27,7 +27,9 @@ import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from '
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
-import { readLocalVault, writeLocalVault } from './storage';
+import type { EncryptedEnvelope } from './crypto';
+import { verifyCloudVault, vaultRevision } from './cloudSafety';
+import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
 import { cloudConfigured, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 
@@ -266,6 +268,10 @@ export default function App() {
   const [cloudLoginPassword, setCloudLoginPassword] = useState('');
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
+  const [restoreCandidate, setRestoreCandidate] = useState<EncryptedEnvelope | null>(null);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [previousBackupAvailable, setPreviousBackupAvailable] = useState(false);
+  const [showAdvancedSecurity, setShowAdvancedSecurity] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
@@ -294,6 +300,7 @@ export default function App() {
   }, [preferences.mode,tab]);
 
   useEffect(() => {
+    void readPreviousLocalVault().then(saved => setPreviousBackupAvailable(Boolean(saved))).catch(() => {});
     void readLocalVault().then(saved => setHasVault(Boolean(saved)))
       .catch(() => setGateError('Lokaler Speicher konnte nicht geöffnet werden.'))
       .finally(() => setLoading(false));
@@ -509,32 +516,71 @@ export default function App() {
   }
 
   async function uploadCloud() {
-    if (!window.confirm('Den Cloud-Tresor durch diese lokale verschlüsselte Version ersetzen?')) return;
     setCloudBusy(true); setCloudError('');
     try {
+      await writes.current;
       const stored = await readLocalVault();
-      if (!stored) throw new Error('Kein lokaler Tresor');
-      await cloudUpload(stored);
-      setNotice('Verschlüsselte Sicherung hochgeladen');
-    } catch { setCloudError('Upload fehlgeschlagen. Firebase-Regeln, Anmeldung und Speichergröße prüfen.'); }
-    finally { setCloudBusy(false); }
+      if (!stored) throw new Error('Kein lokaler Tresor.');
+      const previous = await cloudDownload();
+      if (previous && previous.ciphertext === stored.ciphertext) {
+        setNotice('Die Cloud-Sicherung ist bereits aktuell.');
+        return;
+      }
+      if (previous && !window.confirm('Eine andere Cloud-Sicherung existiert. Durch deinen aktuellen Tresor ersetzen? Nicht synchronisierte Änderungen anderer Geräte könnten verloren gehen.')) return;
+      await cloudUpload(stored, vaultRevision(previous));
+      setNotice('Deine verschlüsselte Sicherung wurde gespeichert.');
+    } catch (error) {
+      setCloudError(error instanceof Error && error.message.includes('CLOUD_CONFLICT')
+        ? 'Die Sicherung wurde von einem anderen Gerät geändert. Bitte erneut prüfen.'
+        : 'Sicherung fehlgeschlagen. Verbindung, Anmeldung und Cloud-Berechtigung prüfen.');
+    } finally { setCloudBusy(false); }
   }
 
   async function downloadCloud() {
     setCloudBusy(true); setCloudError('');
     try {
       const remote = await cloudDownload();
-      if (!remote) { setCloudError('Für dieses Konto ist noch kein Cloud-Tresor vorhanden.'); return; }
-      if (!window.confirm('ACHTUNG: Dies ersetzt den gesamten lokalen Tresor. Nicht synchronisierte lokale Einträge gehen verloren. Fortfahren?')) return;
+      if (!remote) { setCloudError('Für dein Konto gibt es noch keine Cloud-Sicherung.'); return; }
+      setRestorePassword('');
+      setRestoreCandidate(remote);
+    } catch {
+      setCloudError('Cloud-Sicherung konnte nicht geladen werden. Bitte Verbindung prüfen.');
+    } finally { setCloudBusy(false); }
+  }
+
+  async function confirmCloudRestore(event: FormEvent) {
+    event.preventDefault();
+    if (!restoreCandidate || cloudBusy) return;
+    setCloudBusy(true); setCloudError('');
+    try {
+      await verifyCloudVault(restoreCandidate, restorePassword);
       await writes.current;
-      await writeLocalVault(remote);
       await disableDeviceUnlock();
       setDeviceEnabled(false);
-      lockVault();
-      setHasVault(true);
-      setNotice('Cloud-Tresor heruntergeladen. Mit zugehörigem Master-Passwort entsperren.');
-    } catch { setCloudError('Download fehlgeschlagen. Bitte Firebase-Verbindung prüfen.'); }
-    finally { setCloudBusy(false); }
+      await replaceVaultWithVerifiedCloudCopy(restoreCandidate);
+      setPreviousBackupAvailable(true);
+      setRestoreCandidate(null); setRestorePassword('');
+      lockVault(); setHasVault(true);
+      setNotice('Cloud-Sicherung wiederhergestellt. Bitte mit dem Sicherungspasswort öffnen.');
+    } catch (error) {
+      setCloudError(error instanceof Error ? error.message : 'Wiederherstellung fehlgeschlagen. Deine lokale Version bleibt erhalten.');
+    } finally { setCloudBusy(false); }
+  }
+
+  async function undoCloudRestore() {
+    if (!window.confirm('Den vorherigen lokalen Tresor zurückholen? Der aktuelle Stand bleibt verschlüsselt als Rückfallkopie erhalten.')) return;
+    setCloudBusy(true); setCloudError('');
+    try {
+      await writes.current;
+      await disableDeviceUnlock();
+      setDeviceEnabled(false);
+      if (!await restorePreviousLocalVault()) throw new Error('Keine vorherige lokale Sicherung gefunden.');
+      setRestoreCandidate(null); setRestorePassword('');
+      lockVault(); setHasVault(true);
+      setNotice('Vorherigen Tresor wiederhergestellt. Bitte erneut entsperren.');
+    } catch (error) {
+      setCloudError(error instanceof Error ? error.message : 'Lokale Wiederherstellung fehlgeschlagen.');
+    } finally { setCloudBusy(false); }
   }
 
   const entries = data?.entries ?? [];
@@ -587,7 +633,7 @@ export default function App() {
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? 'Tresor entsperren' : 'Sicheren Tresor erstellen'} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
         {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck öffnen</button>}
-        {hasVault && <LicensePanel compact/>}
+
         <p className="lock-footnote">{hasVault ? 'Dein Tresor-Passwort bleibt auf deinem Gerät.' : 'Wichtig: Schreibe dir dein Tresor-Passwort an einem sicheren Ort auf. Ohne dieses Passwort sind die Daten nicht wiederherstellbar.'}</p>
       </section>
       <footer className="lock-footer">PassManager · by Shadowless Studios</footer>
@@ -604,11 +650,11 @@ export default function App() {
           <div className="brand-line"><div className="brand-icon"><ShieldCheck size={22}/></div><div><strong>PassManager</strong><small>PERSONAL VAULT</small></div></div>
           <div className="top-actions">
             <span className="security-indicator"><span className="status-dot"/> Verschlüsselt</span>
-            <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
+            {!simple && <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
               aria-label={'Zu ' + (simple ? 'Experten-Modus' : 'Einfach-Modus') + ' wechseln'}
               onClick={() => setPreferences(old => ({...old, mode: old.mode === 'simple' ? 'expert' : 'simple'}))}>
               <SlidersHorizontal size={15}/> {simple ? 'Einfach' : 'Experte'}
-            </button>
+            </button>}
             <button type="button" className="icon-btn" onClick={lockVault} title="Tresor sperren" aria-label="Tresor sperren"><LockKeyhole size={20}/></button>
           </div>
         </header>
@@ -620,12 +666,12 @@ export default function App() {
                 ? (tab === 'categories' ? 'Finde deine Zugänge in übersichtlichen Ordnern.' : entries.length + ' ' + (entries.length === 1 ? 'gespeicherter Zugang' : 'gespeicherte Zugänge'))
                 : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
             </div>
-            {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
+            {tab !== 'settings' && tab !== 'insights' && (!simple || tab !== 'vault') && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
           </div>
 
           {tab === 'vault' && <div className="quick-action-strip">
-            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={22}/> {simple ? 'Neues Passwort speichern' : 'Schnell speichern'}</button>
-            <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> {simple ? 'Daten aus Foto übernehmen' : 'Aus Bild erkennen'}</button>
+            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={22}/> {simple ? 'Passwort hinzufügen' : 'Schnell speichern'}</button>
+            {!simple && <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> Aus Bild erkennen</button>}
           </div>}
 
           {tab === 'vault' && !simple && <div className="welcome-panel">
@@ -732,7 +778,8 @@ export default function App() {
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
               <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
               {!deviceSupported && <p className="settings-note">Diese Funktion ist in der installierten Android-App mit eingerichteter Gerätesperre verfügbar.</p>}
-              <div className="setting-timeouts">
+              {simple && <button type="button" className="quick-optional-action" aria-expanded={showAdvancedSecurity} onClick={() => setShowAdvancedSecurity(v => !v)}>{showAdvancedSecurity ? 'Weitere Sicherheitseinstellungen schließen' : 'Weitere Sicherheitseinstellungen'}</button>}
+              {(!simple || showAdvancedSecurity) && <div className="setting-timeouts">
                 <label>Wenn die App im Hintergrund ist
                   <select aria-label="Sperrzeit im Hintergrund" value={preferences.backgroundLockMs}
                     onChange={event => setPreferences(old => ({...old,backgroundLockMs:Number(event.target.value)}))}>
@@ -746,37 +793,38 @@ export default function App() {
                   </select>
                 </label>
                 <p className="settings-note">Kurzes Wechseln zu einer anderen App erfordert nicht sofort eine neue Anmeldung. Nach einem vollständigen Neustart oder wenn Android den Prozess beendet, ist weiterhin eine sichere Entsperrung nötig.</p>
-              </div>
+              </div>}
               <button className="outline-btn" type="button" onClick={lockVault}><LogOut size={17}/> Tresor jetzt sperren</button>
             </section>
 
-            {!simple && <>
             <section className="settings-card">
-              <div className="settings-heading"><span className="settings-icon cloud"><Cloud size={22}/></span><div><h2>Firebase Cloud-Backup</h2><p>Optional – nur verschlüsselte Tresordaten werden übertragen.</p></div></div>
-              {!cloudConfigured ? <div className="info-panel"><Cloud size={19}/><p>Firebase ist vorbereitet, aber noch nicht eingerichtet. Trage die Werte aus <code>.env.example</code> in <code>.env.local</code> ein und aktiviere Firebase Authentication (E-Mail/Passwort) und Firestore.</p></div> : cloudUser ? <>
+              <div className="settings-heading"><span className="settings-icon cloud"><Cloud size={22}/></span><div><h2>{simple ? 'Meine Passwörter sichern' : 'Firebase Cloud-Backup'}</h2><p>{simple ? 'Freiwillige Sicherung für einen späteren Handywechsel.' : 'Optional – nur verschlüsselte Tresordaten werden übertragen.'}</p></div></div>
+              {!cloudConfigured ? <div className="info-panel"><Cloud size={19}/><p>{simple ? 'Cloud-Sicherung ist für diese Version noch nicht freigeschaltet.' : <>Firebase ist noch nicht eingerichtet. Trage die Konfiguration aus <code>.env.example</code> in <code>.env.local</code> ein und aktiviere Authentication sowie Firestore.</>}</p></div> : cloudUser ? <>
                 <div className="signed-in"><span className="status-dot"/><span>Angemeldet als <strong>{cloudUser}</strong></span></div>
                 <div className="cloud-buttons">
-                  <button className="primary-btn" disabled={cloudBusy} onClick={() => void uploadCloud()}><ArrowUpToLine size={18}/> Verschlüsseltes Backup hochladen</button>
-                  <button className="secondary-btn" disabled={cloudBusy} onClick={() => void downloadCloud()}><ArrowDownToLine size={18}/> Cloud-Backup wiederherstellen</button>
+                  <button className="primary-btn" disabled={cloudBusy} onClick={() => void uploadCloud()}><ArrowUpToLine size={18}/> {simple ? 'Passwörter jetzt sichern' : 'Verschlüsseltes Backup hochladen'}</button>
+                  <button className="secondary-btn" disabled={cloudBusy} onClick={() => void downloadCloud()}><ArrowDownToLine size={18}/> {simple ? 'Sicherung laden' : 'Cloud-Backup wiederherstellen'}</button>
                 </div>
-                <p className="settings-note">Manuelle Sicherung: Der Upload ersetzt die bisherige Cloud-Version; der Download ersetzt alle lokalen Einträge. Noch kein automatischer Konfliktabgleich.</p>
+                <p className="settings-note">Nur verschlüsselte Daten verlassen dein Gerät. Eine Wiederherstellung erfordert das Sicherungspasswort; die vorige lokale Version bleibt verschlüsselt erhalten. Die Sicherung läuft nicht automatisch.</p>
                 <button className="text-btn" onClick={() => void cloudSignOut().then(() => setCloudUser(null))}>Cloud-Konto abmelden</button>
               </> : <div className="cloud-login">
                 <label>E-Mail<input type="email" autoComplete="username" value={cloudLoginEmail} onChange={e => setCloudLoginEmail(e.target.value)} placeholder="name@beispiel.de"/></label>
-                <label>Firebase-Kontopasswort<input type="password" autoComplete="current-password" value={cloudLoginPassword} onChange={e => setCloudLoginPassword(e.target.value)} placeholder="Firebase-Passwort"/></label>
+                <label>{simple ? 'Passwort für dein Sicherungskonto' : 'Firebase-Kontopasswort'}<input type="password" autoComplete="current-password" value={cloudLoginPassword} onChange={e => setCloudLoginPassword(e.target.value)} placeholder="Firebase-Passwort"/></label>
                 <div className="cloud-buttons"><button className="primary-btn" disabled={cloudBusy || !cloudLoginEmail || !cloudLoginPassword} onClick={() => void signIntoCloud(false)}>Anmelden</button><button className="secondary-btn" disabled={cloudBusy || !cloudLoginEmail || cloudLoginPassword.length < 6} onClick={() => void signIntoCloud(true)}>Konto erstellen</button></div>
-                <p className="settings-note">Dein Firebase-Passwort und dein Master-Passwort sind unabhängig voneinander.</p>
+                <p className="settings-note">Dein Sicherungskonto-Passwort und das Tresor-Passwort sind unabhängig voneinander.</p>
               </div>}
+              {previousBackupAvailable && <button type="button" className="outline-btn" disabled={cloudBusy} onClick={() => void undoCloudRestore()}><ArrowDownToLine size={18}/> Vorherigen lokalen Tresor zurückholen</button>}
               {cloudError && <p className="error-box" role="alert">{cloudError}</p>}
             </section>
 
+            {!simple && <>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><UsersRound size={22}/></span><div><h2>Passwörter sicher teilen</h2><p>Geplant: Ende-zu-Ende-verschlüsselte Freigaben.</p></div></div>
               <div className="info-panel"><ShieldCheck size={21}/><p>Freigaben werden erst aktiviert, wenn Empfängerschlüssel, Einladungen, Widerruf und Verschlüsselung vollständig umgesetzt und überprüft sind. Es werden keine Klartext-Passwörter über Links oder Firebase geteilt.</p></div>
             </section>
 
             </>}
-            <p className="version-line">PassManager v0.5.0 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">PassManager v0.6.2 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
@@ -833,6 +881,27 @@ export default function App() {
         await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
+      {restoreCandidate && <div className="overlay" role="presentation">
+        <section className="sheet cloud-restore-sheet" role="dialog" aria-modal="true" aria-label="Cloud-Sicherung prüfen">
+          <header className="sheet-header"><ShieldCheck size={21}/><h2>Sicherung sicher wiederherstellen</h2>
+            <button type="button" className="icon-btn" disabled={cloudBusy} aria-label="Abbrechen"
+              onClick={() => {setRestoreCandidate(null);setRestorePassword('');setCloudError('');}}><X size={20}/></button></header>
+          <form className="editor-form" onSubmit={e => void confirmCloudRestore(e)}>
+            <p className="input-help">Wir prüfen zuerst das Passwort deiner gesicherten Passwörter. Erst danach wird die Wiederherstellung durchgeführt.</p>
+            <label>Passwort des gesicherten Tresors
+              <input autoFocus type="password" autoComplete="off" required value={restorePassword}
+                onChange={e => setRestorePassword(e.target.value)} placeholder="Passwort der Cloud-Sicherung"/>
+            </label>
+            <p className="master-warning">Die bisher gespeicherten Einträge werden ersetzt. Vorher wird eine verschlüsselte Rückfallkopie auf diesem Gerät erstellt.</p>
+            {cloudError && <p className="error-box" role="alert">{cloudError}</p>}
+            <div className="sheet-actions">
+              <button type="button" className="secondary-btn" disabled={cloudBusy}
+                onClick={() => {setRestoreCandidate(null);setRestorePassword('');setCloudError('');}}>Abbrechen</button>
+              <button type="submit" className="primary-btn" disabled={cloudBusy || !restorePassword}>Prüfen und wiederherstellen</button>
+            </div>
+          </form>
+        </section>
+      </div>}
       {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} simple={simple} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
       {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} onClose={() => setEditing(null)} onSave={saveEntry}/>}

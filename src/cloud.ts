@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import type { EncryptedEnvelope } from './crypto';
 
 const firebaseConfig = {
@@ -34,9 +34,16 @@ function requireCloudUser(): string {
   return auth.currentUser.uid;
 }
 
-export async function cloudUpload(envelope: EncryptedEnvelope): Promise<void> {
+export async function cloudUpload(envelope: EncryptedEnvelope, expectedRevision: string | null): Promise<void> {
   const uid = requireCloudUser();
-  await setDoc(doc(db!, 'vaults', uid), { envelope, updatedAt: serverTimestamp() });
+  const ref = doc(db!, 'vaults', uid);
+  await runTransaction(db!, async transaction => {
+    const saved = await transaction.get(ref);
+    const current = saved.exists() ? saved.data().envelope as EncryptedEnvelope : null;
+    const revision = current ? current.nonce + ':' + current.updatedAt : null;
+    if (revision !== expectedRevision) throw new Error('CLOUD_CONFLICT');
+    transaction.set(ref, { envelope, updatedAt: serverTimestamp() });
+  });
 }
 
 export async function cloudDownload(): Promise<EncryptedEnvelope | null> {
