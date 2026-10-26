@@ -6,6 +6,7 @@ import { CATEGORY_COLORS, CATEGORY_ICONS, makeCategory } from './categories';
 type Props = {
   categories: VaultCategory[];
   entries: VaultEntry[];
+  simple?: boolean;
   onOpen: (name: string) => void;
   onSave: (category: VaultCategory, oldId?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -19,16 +20,18 @@ export function CategoryIcon({category, size=22}:{category:VaultCategory;size?:n
   const Icon = icons[category.icon as keyof typeof icons] || Folder;
   return <Icon size={size}/>;
 }
-export default function CategoryManager({categories, entries, onOpen,onSave,onDelete}:Props){
+export default function CategoryManager({categories, entries, onOpen,onSave,onDelete,simple=false}:Props){
   const [editing,setEditing] = useState<VaultCategory|null>(null);
   const [newCategory,setNewCategory]=useState(false);
   const [name,setName]=useState('');
   const [color,setColor]=useState<string>(CATEGORY_COLORS[0]);
   const [icon,setIcon]=useState('folder');
   const [busy,setBusy]=useState(false);
+  const [customize,setCustomize]=useState(false);
   const [error,setError]=useState('');
   function edit(category?:VaultCategory){
     setEditing(category ?? null);setNewCategory(!category);
+    setCustomize(!simple);
     setName(category?.name??'');setColor(category?.color??CATEGORY_COLORS[0]);
     setIcon(category?.icon??'folder');setError('');
   }
@@ -63,6 +66,9 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
           <button type="button" className="icon-btn" aria-label="Schließen" onClick={()=>{setEditing(null);setNewCategory(false);}}><X size={19}/></button></header>
         <form className="editor-form" onSubmit={e=>void save(e)}>
           <label>Kategoriename<input autoFocus maxLength={70} placeholder="z. B. Zuhause" value={name} onChange={e=>setName(e.target.value)}/></label>
+          {simple && <button type="button" className="quick-optional-action" onClick={()=>setCustomize(previous=>!previous)}
+            aria-expanded={customize}>{customize ? 'Weniger anzeigen' : 'Farbe und Symbol auswählen (freiwillig)'}</button>}
+          {customize && <>
           <div className="field-label">Symbol wählen</div><div className="category-icons">
             {CATEGORY_ICONS.map(choice=>{
               const Icon=icons[choice.value as keyof typeof icons];return <button type="button" title={choice.label} aria-label={choice.label} aria-pressed={icon===choice.value}
@@ -75,6 +81,7 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
               {color===value&&<span><Folder size={16}/></span>}
             </button>)}
           </div>
+          </>}
           {error&&<p className="error-box" role="alert">{error}</p>}
           <div className="sheet-actions">
             {editing&&<button className="danger-btn" type="button" disabled={busy} onClick={()=>{

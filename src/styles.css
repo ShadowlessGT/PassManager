@@ -470,3 +470,141 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,select:focus-vis
   .simple-ui .simple-copy-btn { min-width:122px;font-size:14px;padding:12px; }
   .simple-ui .simple-copy-btn svg { width:21px;height:21px; }
 }
+
+
+/* v0.6 Appearance: explicit accessible light palette; dark theme remains unchanged. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface-base:#f6f8fa; --surface-raised:#ffffff;
+  --surface-input:#f4f7f8; --surface-hover:#e9f1f2;
+  --stroke:#cbd6da; --foreground:#17282e;
+  --muted:#485d65; --accent:#176574; --accent-strong:#105663;
+  background:#f6f8fa; color:#17282e;
+}
+html[data-theme="light"],html[data-theme="light"] body,html[data-theme="light"] #root {background:#f6f8fa;color:#17282e;}
+html[data-theme="light"] .app-shell,html[data-theme="light"] .lock-layout {
+  background:linear-gradient(180deg,#fafcfd,#f3f6f8);color:#17282e;
+}
+html[data-theme="light"] .lock-glow {background:radial-gradient(ellipse,#c5e5e766,transparent 68%);}
+html[data-theme="light"] :is(.topbar,.section-head,.brand-line,.list-title,.detail-top,.lock-card,.category-manager-intro) {color:#17282e;}
+html[data-theme="light"] :is(.section-subtitle,.lock-intro,.lock-footnote,.lock-footer,.settings-note,
+  .settings-heading p,.category-manager-intro p,.detail-top p,.detail-footer,.entry-text small,.empty-state p,
+  .version-line,.field-label small,.input-help,.category-view-btn small,.setting-timeouts .settings-note) {color:#435760;}
+html[data-theme="light"] :is(.entry-card,.settings-card,.category-manager-card,.insight-stat,
+  .insights-card,.collection-card,.empty-state,.license-compact,.quick-sheet,.category-picker,.mode-card,
+  .info-panel,.import-drop,.custom-field-row) {background:#fff;border-color:#cbd6da;color:#182a2f;}
+html[data-theme="light"] :is(.entry-card:hover,.collection-card:hover,.category-manager-card:hover) {
+  background:#f1f7f8;border-color:#8aaeb4;
+}
+html[data-theme="light"] .sheet {background:#fff;border-color:#c9d5d9;box-shadow:0 -12px 55px #10252933;color:#1a2d32;}
+html[data-theme="light"] .sheet-header {border-color:#d8e2e5;color:#1d2e34;}
+html[data-theme="light"] .details-sheet .sheet-header {background:#fff;}
+html[data-theme="light"] .overlay {background:#13232993;}
+html[data-theme="light"] .searchbox,html[data-theme="light"] :is(.quick-secret,.master-password-control,
+  .code-entry,.import-preview,.custom-field-row,.category-picker,.category-inline-create) {
+  background:#f4f7f8;border-color:#b9cbd0;color:#20333a;
+}
+html[data-theme="light"] :is(.editor-form input:not([type="checkbox"]),.editor-form textarea,
+  .gate-form input,.cloud-login input,.category-inline-create input,.quick-secret input,
+  .custom-field-toolbar select,.field-buttons select,.setting-timeouts select,.person-filter select,
+  .code-entry input,.admin-controls input,.generated-codes) {
+  background:#f7fafb !important; color:#17272e !important; border-color:#aebfc5 !important;
+}
+html[data-theme="light"] :is(input,textarea)::placeholder {color:#627580;}
+html[data-theme="light"] :is(.editor-form label,.cloud-login label,.gate-form label,.quick-sheet .editor-form label,
+  .setting-timeouts label,.category-picker .field-label,.settings-row strong) {color:#263d43;}
+html[data-theme="light"] :is(.editor-form input:focus,.gate-form input:focus,.cloud-login input:focus,
+  .quick-secret:focus-within,.searchbox:focus-within) {border-color:#176574 !important;outline-color:#176574;}
+html[data-theme="light"] .searchbox input {background:transparent !important;color:#1c3037 !important;border:0 !important;}
+html[data-theme="light"] :is(.primary-btn,.add-btn,.quick-primary) {background:#176574;color:#fff;border-color:#176574;}
+html[data-theme="light"] :is(.primary-btn:hover,.add-btn:hover,.quick-primary:hover) {background:#105663;}
+html[data-theme="light"] :is(.secondary-btn,.outline-btn,.quick-secondary,.quick-generate-action,
+  .quick-optional-action,.simple-copy-btn,.biometric-btn,.mode-switch,.text-btn) {
+  background:#eaf2f4;color:#14515d;border-color:#a7c2c8;
+}
+html[data-theme="light"] :is(.quick-optional-action,.text-btn) {background:transparent;}
+html[data-theme="light"] :is(.entry-avatar,.detail-avatar,.collection-icon,.category-large-icon,.settings-icon) {
+  background:#e2edef;color:#206371;
+}
+html[data-theme="light"] .brand-icon {background:linear-gradient(145deg,#287987,#1a5864);color:white;}
+html[data-theme="light"] :is(.eyebrow,.form-section-title,.text-btn,.back-filter,.welcome-shield,
+  .insight-stat-header svg,.insights-card h3 svg) {color:#256673;}
+html[data-theme="light"] .list-title span {background:#e2eff1;color:#185c68;}
+html[data-theme="light"] :is(.mini-tags em,.tag-row span,.suggestion,.category-chip) {
+  background:#edf3f5;color:#255766;border-color:#b9cdd1;
+}
+html[data-theme="light"] :is(.category-chip.chosen,.suggestion.selected) {background:#cbe5e9;color:#123e46;border-color:#448995;}
+html[data-theme="light"] .category-chip.category-add {background:#fff;color:#1b6170;border-color:#719fa8;}
+html[data-theme="light"] :is(.entry-actions .icon-btn,.icon-btn,.field-action) {color:#385963;}
+html[data-theme="light"] :is(.entry-actions .icon-btn:hover,.icon-btn:hover,.field-action:hover) {background:#e7f0f2;color:#174e5a;}
+html[data-theme="light"] .bottom-nav {background:#ffffffed;border-color:#cad7d9;}
+html[data-theme="light"] .nav-item {color:#49636d;}
+html[data-theme="light"] .nav-item.selected {background:#d9e9ec;color:#115566;}
+html[data-theme="light"] .mode-choice button {background:#f2f6f7;color:#28424b;border-color:#c6d6db;}
+html[data-theme="light"] .mode-choice button strong {color:#20383f;}
+html[data-theme="light"] .mode-choice button small {color:#425b65;}
+html[data-theme="light"] .mode-choice button.active {background:#d7ecef;border-color:#247684;}
+html[data-theme="light"] .mode-choice button.active strong {color:#113e48;}
+html[data-theme="light"] .appearance-choice button {background:#f5f8f9;border-color:#bccdd2;color:#304d55;}
+html[data-theme="light"] .appearance-choice button.active {background:#d6e9eb;color:#124c58;border-color:#227786;}
+html[data-theme="light"] .lock-pill {background:#e8f3ee;color:#175d4e;border-color:#bad9ce;}
+html[data-theme="light"] .lock-card h1 span {color:#176574;}
+html[data-theme="light"] .master-advice {background:#edf6f3;color:#31594d;border-color:#bad6ce;}
+html[data-theme="light"] .master-advice strong {color:#194f42;}
+html[data-theme="light"] .master-warning {background:#fff4df;color:#795123;border-color:#cc9c4c;}
+html[data-theme="light"] .master-visibility {color:#355862;}
+html[data-theme="light"] .error-box {background:#fff0f0;color:#932f3a;border-color:#eab1b5;}
+html[data-theme="light"] .detail-field {border-color:#d9e2e5;}
+html[data-theme="light"] .detail-field > span {color:#4b6670;}
+html[data-theme="light"] .detail-field strong {color:#1c3139;}
+html[data-theme="light"] .detail-field a {color:#166476;}
+html[data-theme="light"] .detail-footer {border-color:#d4e0e2;}
+html[data-theme="light"] .welcome-panel {background:#e6f2f3;border-color:#c3dadd;}
+html[data-theme="light"] .welcome-panel :is(h2,p) {color:#20414b;}
+html[data-theme="light"] .welcome-visual {background:#f4fbfb;color:#286875;border-color:#bed9dc;box-shadow:none;}
+html[data-theme="light"] .settings-row {border-color:#d9e2e5;}
+html[data-theme="light"] .settings-row small {color:#4c6068;}
+html[data-theme="light"] .toggle {background:#c5d1d4;}
+html[data-theme="light"] .toggle.active {background:#20737d;}
+html[data-theme="light"] :is(.info-panel p,.license-compact p,.insight-stat-header,.insight-note) {color:#45616b;}
+html[data-theme="light"] .insight-tabs {background:#f1f6f7;border-color:#c6d7da;}
+html[data-theme="light"] .insight-tabs button {color:#47616b;}
+html[data-theme="light"] .insight-tabs button.selected {background:#1a6674;color:white;}
+html[data-theme="light"] .category-manager-card .category-view-btn {color:#1c3039;}
+html[data-theme="light"] .category-icons button {background:#f1f5f6;color:#295b65;border-color:#afc5ca;}
+html[data-theme="light"] .category-icons button.chosen {background:#d3e9eb;color:#175563;border-color:#267686;}
+html[data-theme="light"] .danger-btn {background:#fff0f0;color:#992b41;border-color:#e4b1bb;}
+html[data-theme="light"] .toast {background:#e2f6ec;color:#18533b;border-color:#a2d2b7;}
+html[data-theme="light"] ::selection {background:#b5dee3;color:#193740;}
+
+/* v0.6 Accessibility: visible choices, high legibility and spacious controls. */
+.accessibility-options {border-top:1px solid #3f5054;margin-top:18px;padding-top:18px;display:grid;gap:13px;}
+.accessibility-options .field-label {font-size:15px;font-weight:750;color:var(--foreground);}
+.appearance-choice {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.appearance-choice button {min-height:52px;border-radius:11px;border:1px solid #52656a;background:#222c30;
+  color:#e2ecee;font-size:14px;font-weight:700;padding:8px 5px;}
+.appearance-choice button.active {background:#22545d;border:2px solid #7db0b8;color:#fff;padding:7px 4px;}
+html[data-theme="light"] .accessibility-options {border-color:#cfdee1;}
+.simple-ui .nav-item {min-height:56px;min-width:66px;}
+.simple-ui .icon-btn:not(.compact) {min-height:48px;min-width:48px;}
+.simple-ui .simple-copy-btn,.simple-ui .quick-primary,.simple-ui .quick-secondary,.simple-ui .add-btn {min-height:56px;}
+.simple-ui .mode-switch {min-height:48px;}
+.simple-ui .category-picker button {min-height:48px;}
+.simple-ui.text-large .entry-text strong {font-size:19px;}
+.simple-ui.text-large .entry-text small,.simple-ui.text-large .section-subtitle {font-size:16px;}
+.simple-ui.text-large .settings-heading h2 {font-size:19px;}
+.simple-ui.text-large .settings-heading p,.simple-ui.text-large .settings-row small,.simple-ui.text-large .settings-note {font-size:15px;line-height:1.55;}
+.simple-ui.text-large .settings-row strong,.simple-ui.text-large .category-view-btn strong {font-size:18px;}
+.simple-ui.text-large .quick-primary,.simple-ui.text-large .quick-secondary {font-size:17px;}
+.simple-ui.text-large .nav-item span {font-size:13px;}
+.simple-ui.text-extra-large .entry-text strong {font-size:22px;white-space:normal;}
+.simple-ui.text-extra-large .entry-text small {font-size:18px;white-space:normal;}
+.simple-ui.text-extra-large .section-subtitle {font-size:18px;}
+.simple-ui.text-extra-large .settings-heading h2 {font-size:22px;}
+.simple-ui.text-extra-large .settings-heading p,.simple-ui.text-extra-large .settings-note {font-size:17px;}
+.simple-ui.text-extra-large .settings-row strong,.simple-ui.text-extra-large .category-view-btn strong {font-size:20px;}
+.simple-ui.text-extra-large .quick-primary,.simple-ui.text-extra-large .quick-secondary {font-size:19px;}
+.simple-ui.text-extra-large .nav-item span {font-size:15px;}
+.simple-ui.text-extra-large .entry-card {min-height:114px;}
+.simple-ui.text-extra-large .entry-open {min-height:82px;}
+@media(max-width:390px){.appearance-choice button {font-size:12px;} .simple-ui .topbar {gap:8px;}}

@@ -23,6 +23,7 @@ import CategoryManager from './CategoryManager';
 import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory } from './categories';
 import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
 import type { UserPreferences } from './preferences';
+import { resolveAppearance, applyResolvedAppearance } from './theme';
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
@@ -274,6 +275,15 @@ export default function App() {
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => {
+    // Android WebView reflects the device's appearance through prefers-color-scheme.
+    // A running instance also reacts to changes in the Android system setting.
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const synchronize = () => applyResolvedAppearance(resolveAppearance(preferences.appearance, media.matches));
+    synchronize();
+    media.addEventListener('change', synchronize);
+    return () => media.removeEventListener('change', synchronize);
+  }, [preferences.appearance]);
   useEffect(() => {
     if (preferences.mode === 'simple' && !['vault','categories','settings'].includes(tab)) {
       setTab('vault'); setPersonFilter(null); setCategoryFilter(null);
@@ -584,7 +594,7 @@ export default function App() {
   const showEntries = tab === 'vault' || tab === 'favorites' || (tab === 'categories' && categoryFilter) || (tab === 'people' && personFilter);
 
   return (
-    <div className={simple ? 'app-shell simple-ui' : 'app-shell expert-ui'}>
+    <div className={simple ? 'app-shell simple-ui text-' + preferences.textSize : 'app-shell expert-ui'}>
       <div className="app-content">
         <header className="topbar">
           <div className="brand-line"><div className="brand-icon"><ShieldCheck size={22}/></div><div><strong>PassManager</strong><small>PERSONAL VAULT</small></div></div>
@@ -628,7 +638,7 @@ export default function App() {
             <button type="button" className="text-btn" onClick={() => setTab('people')}>Personen anzeigen</button>
           </div>}
           {tab === 'insights' && <InsightsPanel data={data} onOpen={openEntry} onDeleteHistory={clearHistory}/>}
-          {tab === 'categories' && !categoryFilter && <CategoryManager
+          {tab === 'categories' && !categoryFilter && <CategoryManager simple={simple}
             categories={categories} entries={entries}
             onOpen={name => { setCategoryFilter(name); setQuery(''); }}
             onSave={saveCategory} onDelete={deleteCategory}/>}
@@ -684,6 +694,27 @@ export default function App() {
                 </button>
               </div>
               <p className="settings-note">Die Wahl ändert nur die Darstellung. Gespeicherte Zugangsdaten bleiben immer erhalten.</p>
+              <div className="accessibility-options">
+                <div className="field-label">Darstellung</div>
+                <div className="appearance-choice" role="group" aria-label="Farbschema wählen">
+                  {([
+                    ['system','System'],['light','Hell'],['dark','Dunkel']
+                  ] as const).map(([value,label])=><button key={value} type="button"
+                    className={preferences.appearance === value ? 'active' : ''}
+                    aria-pressed={preferences.appearance === value}
+                    onClick={()=>setPreferences(previous=>({...previous,appearance:value}))}>{label}</button>)}
+                </div>
+                <p className="settings-note">Mit „System“ übernimmt die App automatisch die helle oder dunkle Darstellung deines Handys.</p>
+                <div className="field-label">Schriftgröße im Einfach-Modus</div>
+                <div className="appearance-choice" role="group" aria-label="Schriftgröße wählen">
+                  {([
+                    ['normal','Normal'],['large','Groß'],['extra-large','Sehr groß']
+                  ] as const).map(([value,label])=><button key={value} type="button"
+                    className={preferences.textSize === value ? 'active' : ''}
+                    aria-pressed={preferences.textSize === value}
+                    onClick={()=>setPreferences(previous=>({...previous,textSize:value}))}>{label}</button>)}
+                </div>
+              </div>
             </section>
             {!simple && <>
             <LicensePanel/>

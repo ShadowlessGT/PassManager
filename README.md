@@ -16,6 +16,14 @@ An offline-first password vault, built with React 19, TypeScript, Vite, and Capa
 - Android FLAG_SECURE screenshot/screen-recording protection with official Capacitor Privacy Screen plugin.
 - Optional Firebase Email/Password authentication plus **manual** encrypted cloud upload/restore; no unencrypted vault values uploaded.
 
+## v0.6.0 – Accessible appearance and locale release plan
+- System/Light/Dark themes, default follows current Android setting and updates when it changes. New explicit light palette; neutral charcoal dark palette.
+- Font size for Simple mode: Normal / Groß / Sehr groß; starts in Simple with Groß. All preferences stored locally, no vault schema change.
+- Category editing in Simple: name first, optional colors/icons hidden until expanded.
+- Documentation: \`docs/ACCESSIBILITY_AND_LOCALIZATION.md\` provides older-adult UX acceptance criteria and the exact **20 target** locales.
+- **Important:** 20 complete installed-app translations do **not** exist yet. The German strings still embedded in React must be extracted and translated before advertising 20 supported languages. This build implements theme/accessibility foundations, not multilingual release completion.
+- No GitHub Actions: build locally only on owner PC/Bridge.
+
 ## v0.5.0 – Accessible Simple mode, neutral dark design, six-character minimum
 
 - **New vault creation** accepts a master password of at least **6 characters** (was 12), while prominently recommending **12+ characters** and warning in the setup form about the higher risk of short master passwords. The two confirmation fields must still match. This does not weaken the existing PBKDF2/AES-256-GCM encryption format, but shorter human-chosen master passwords are significantly easier to guess if encrypted vault data are obtained.
