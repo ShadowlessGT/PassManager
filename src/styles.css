@@ -608,3 +608,6 @@ html[data-theme="light"] .accessibility-options {border-color:#cfdee1;}
 .simple-ui.text-extra-large .entry-card {min-height:114px;}
 .simple-ui.text-extra-large .entry-open {min-height:82px;}
 @media(max-width:390px){.appearance-choice button {font-size:12px;} .simple-ui .topbar {gap:8px;}}
+
+/* Only Light / Dark appear in Settings; system matching is automatic until the user overrides it. */
+.appearance-choice.theme-choice {grid-template-columns:repeat(2,minmax(0,1fr));}

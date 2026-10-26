@@ -1,6 +1,7 @@
 import type { Appearance } from './preferences';
 
 export type ResolvedAppearance = 'light' | 'dark';
+export const APPEARANCE_CHOICES = [['light', 'Hell'], ['dark', 'Dunkel']] as const;
 
 export function resolveAppearance(preference: Appearance, systemPrefersDark: boolean): ResolvedAppearance {
   return preference === 'system' ? (systemPrefersDark ? 'dark' : 'light') : preference;

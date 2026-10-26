@@ -1,8 +1,11 @@
 import {describe,it,expect} from 'vitest';
-import {resolveAppearance} from './theme';
+import {resolveAppearance,APPEARANCE_CHOICES} from './theme';
 import {DEFAULT_PREFERENCES,normalizePreferences} from './preferences';
 
 describe('appearance and accessibility settings',()=>{
+  it('offers only two visible theme choices without a System entry',()=>{
+    expect(APPEARANCE_CHOICES.map(([id])=>id)).toEqual(['light','dark']);
+  });
   it('follows the current Android/browser theme when selected',()=>{
     expect(resolveAppearance('system',true)).toBe('dark');
     expect(resolveAppearance('system',false)).toBe('light');

@@ -1,3 +1,10 @@
+## v0.6.1 – System detection without a visible third theme
+- On first launch, auto-detect and follow Android light/dark mode.
+- Appearance settings offer only **Hell** and **Dunkel**. The auto-detected effective choice is shown as selected.
+- Tapping either option stores a persistent override. Prior to an override, later device changes remain automatic.
+- Internal preference "system" remains the default for backward compatibility and does not appear as a visible theme selection.
+- All APK builds remain local: no GitHub Actions.
+
 # PassManager – secure Android-first password vault
 
 An offline-first password vault, built with React 19, TypeScript, Vite, and Capacitor 8. The **working local MVP** uses the Web Crypto API to encrypt every entry (including names, URLs, notes, and image attachments) before writing to IndexedDB. Firebase is **optional** and only receives an encrypted vault envelope.

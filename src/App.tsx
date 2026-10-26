@@ -23,7 +23,7 @@ import CategoryManager from './CategoryManager';
 import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory } from './categories';
 import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
 import type { UserPreferences } from './preferences';
-import { resolveAppearance, applyResolvedAppearance } from './theme';
+import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from './theme';
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
@@ -270,20 +270,23 @@ export default function App() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const dataRef = useRef<VaultData | null>(null);
   const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   useEffect(() => {
-    // Android WebView reflects the device's appearance through prefers-color-scheme.
-    // A running instance also reacts to changes in the Android system setting.
+    // Follow Android's theme dynamically while no manual override is selected.
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const synchronize = () => applyResolvedAppearance(resolveAppearance(preferences.appearance, media.matches));
+    const synchronize = () => setSystemDark(media.matches);
     synchronize();
     media.addEventListener('change', synchronize);
     return () => media.removeEventListener('change', synchronize);
-  }, [preferences.appearance]);
+  }, []);
+  useEffect(() => {
+    applyResolvedAppearance(resolveAppearance(preferences.appearance, systemDark));
+  }, [preferences.appearance, systemDark]);
   useEffect(() => {
     if (preferences.mode === 'simple' && !['vault','categories','settings'].includes(tab)) {
       setTab('vault'); setPersonFilter(null); setCategoryFilter(null);
@@ -537,6 +540,7 @@ export default function App() {
   const entries = data?.entries ?? [];
   const categories = useMemo(() => data ? categoriesForVault(data) : [], [data]);
   const simple = preferences.mode === 'simple';
+  const selectedAppearance = resolveAppearance(preferences.appearance, systemDark);
   const people = useMemo(() => [...new Set(entries.map(item => item.person).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')), [data]);
   const filtered = useMemo(() => entries.filter(item => {
     if (tab === 'favorites' && !item.favorite) return false;
@@ -696,15 +700,15 @@ export default function App() {
               <p className="settings-note">Die Wahl ändert nur die Darstellung. Gespeicherte Zugangsdaten bleiben immer erhalten.</p>
               <div className="accessibility-options">
                 <div className="field-label">Darstellung</div>
-                <div className="appearance-choice" role="group" aria-label="Farbschema wählen">
-                  {([
-                    ['system','System'],['light','Hell'],['dark','Dunkel']
-                  ] as const).map(([value,label])=><button key={value} type="button"
-                    className={preferences.appearance === value ? 'active' : ''}
-                    aria-pressed={preferences.appearance === value}
+                <div className="appearance-choice theme-choice" role="group" aria-label="Hell oder Dunkel wählen">
+                  {APPEARANCE_CHOICES.map(([value,label])=><button key={value} type="button"
+                    className={selectedAppearance === value ? 'active' : ''}
+                    aria-pressed={selectedAppearance === value}
                     onClick={()=>setPreferences(previous=>({...previous,appearance:value}))}>{label}</button>)}
                 </div>
-                <p className="settings-note">Mit „System“ übernimmt die App automatisch die helle oder dunkle Darstellung deines Handys.</p>
+                <p className="settings-note">{preferences.appearance === 'system'
+                  ? 'Die App übernimmt automatisch das Design deines Handys. Mit Hell oder Dunkel legst du eine eigene Auswahl fest.'
+                  : 'Deine Auswahl bleibt gespeichert, auch wenn du die App schließt.'}</p>
                 <div className="field-label">Schriftgröße im Einfach-Modus</div>
                 <div className="appearance-choice" role="group" aria-label="Schriftgröße wählen">
                   {([
