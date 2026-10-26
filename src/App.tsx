@@ -604,8 +604,8 @@ export default function App() {
     <main className="lock-layout">
       <div className="lock-glow"/>
       <section className="lock-card">
-        <div className="brand-icon large"><img src="/parola-mark.svg" alt="Parola" /></div>
-        <p className="eyebrow">PAROLA</p>
+        <div className="brand-icon large"><img src="/parola-icon.png" alt="Parola" /></div>
+        <p className="eyebrow parola-gate-title">PASSWORT MANAGER: PAROLA</p>
         <h1>{hasVault ? <>Dein Tresor.<br/><span>Sicher geschützt.</span></> : <>Deine Passwörter.<br/><span>Einfach aufbewahrt.</span></>}</h1>
         <p className="lock-intro">{hasVault
           ? 'Öffne deinen Tresor mit deinem Passwort oder deinem Fingerabdruck.'
@@ -636,7 +636,7 @@ export default function App() {
 
         <p className="lock-footnote">{hasVault ? 'Dein Tresor-Passwort bleibt auf deinem Gerät.' : 'Wichtig: Schreibe dir dein Tresor-Passwort an einem sicheren Ort auf. Ohne dieses Passwort sind die Daten nicht wiederherstellbar.'}</p>
       </section>
-      <footer className="lock-footer">Parola · by Shadowless Studios</footer>
+      <footer className="lock-footer">Passwort Manager: Parola · by Shadowless Studios</footer>
     </main>
   );
 
@@ -647,7 +647,7 @@ export default function App() {
     <div className={simple ? 'app-shell simple-ui text-' + preferences.textSize : 'app-shell expert-ui'}>
       <div className="app-content">
         <header className="topbar">
-          <div className="brand-line"><div className="brand-icon"><img src="/parola-mark.svg" alt="" /></div><div><strong>arola</strong><small>PASSWORD MANAGER</small></div></div>
+          <div className="brand-line"><div className="brand-icon"><img src="/parola-icon.png" alt="" /></div><div><strong>Passwort Manager: <span>Parola</span></strong><small>SHADOWLESS STUDIOS</small></div></div>
           <div className="top-actions">
             <span className="security-indicator"><span className="status-dot"/> Verschlüsselt</span>
             {!simple && <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
@@ -824,7 +824,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Parola v0.6.4 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">Passwort Manager: Parola v0.6.5 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>

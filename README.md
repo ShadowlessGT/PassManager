@@ -1,6 +1,12 @@
+## Parola Original-Branding (v0.6.5)
+- Original-Icon: `public/parola-icon.png`, Launcher-Quellen: `assets/icon.png` und `assets/logo.png`.
+- Original-Wortmarke: `public/parola-wordmark.png`.
+- Farbe: Kobaltblau und Cyan, mit hellem und dunklem Systemtheme.
+- Sichtbarer Name: `Passwort Manager: Parola`; Android-ID unveraendert `com.shadowlessstudios.passwordmanager`.
+
 ## Parola Android-ID und Firebase (26.10.2026)
 
-- App-Name: Parola; Android-Paket / Capacitor appId: `com.shadowlessstudios.passwordmanager`.
+- App-Name: Passwort Manager: Parola; Android-Paket / Capacitor appId: `com.shadowlessstudios.passwordmanager`.
 - Firebase-Projekt: `password-manager-parola`. Android-App muss auf exakt diese Paket-ID registriert sein.
 - Lokale Firebase-Quelle: `H:\Meine Ablage\GoogleServicess Firebase\Parola\google-services.json`.
 - Android-Konfiguration: `android/app/google-services.json` (gitignored); Web-Konfiguration: `.env.local` (gitignored).

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Parola</string>
-    <string name="title_activity_main">Parola</string>
+    <string name="app_name">Passwort Manager: Parola</string>
+    <string name="title_activity_main">Passwort Manager: Parola</string>
     <string name="package_name">com.shadowlessstudios.passwordmanager</string>
     <string name="custom_url_scheme">com.shadowlessstudios.passwordmanager</string>
 </resources>

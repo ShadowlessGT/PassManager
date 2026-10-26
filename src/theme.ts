@@ -11,5 +11,5 @@ export function applyResolvedAppearance(appearance: ResolvedAppearance): void {
   document.documentElement.dataset.theme = appearance;
   document.documentElement.style.colorScheme = appearance;
   const meta = document.querySelector('meta[name="theme-color"]');
-  meta?.setAttribute('content', appearance === 'light' ? '#f6f8fa' : '#0e1113');
+  meta?.setAttribute('content', appearance === 'light' ? '#f4f8ff' : '#0a1122');
 }
