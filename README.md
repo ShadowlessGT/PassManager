@@ -1,3 +1,5 @@
+Release-Status und offene Google-Play-Anforderungen: `docs/GOOGLE_PLAY_RELEASE_CHECKLIST.md`
+
 ## Parola Original-Branding (v0.6.5)
 - Original-Icon: `public/parola-icon.png`, Launcher-Quellen: `assets/icon.png` und `assets/logo.png`.
 - Original-Wortmarke: `public/parola-wordmark.png`.
