@@ -29,7 +29,7 @@ async function confirmDeviceUnlock(): Promise<void> {
   if (!available) throw new Error('Bitte zuerst eine sichere Gerätesperre einrichten.');
   await BiometricAuth.authenticate({
     reason: 'Sicheren Tresor entsperren',
-    androidTitle: 'PassManager entsperren',
+    androidTitle: 'Parola entsperren',
     allowDeviceCredential: true
   });
 }
