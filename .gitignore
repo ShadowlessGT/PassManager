@@ -440,3 +440,8 @@ android/capacitor-cordova-android-plugins/
 **/*.local.err.log
 android/gradle-local.log
 android/gradle-local.err
+
+# Parola local Firebase config
+/.env.local
+/android/app/google-services.json
+/.firebase-web-sdk-config.json

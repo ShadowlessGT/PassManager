@@ -611,3 +611,10 @@ html[data-theme="light"] .accessibility-options {border-color:#cfdee1;}
 
 /* Only Light / Dark appear in Settings; system matching is automatic until the user overrides it. */
 .appearance-choice.theme-choice {grid-template-columns:repeat(2,minmax(0,1fr));}
+
+/* Parola identity: standalone transparent mark, no colored tile. */
+.brand-icon, html[data-theme="light"] .brand-icon { background: transparent !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; overflow: visible; }
+.brand-icon img { display:block; width:100%; height:100%; object-fit:contain; }
+.brand-line { gap:3px; }
+.brand-line strong { font-size:26px; letter-spacing:-.8px; line-height:1.15; }
+.brand-icon.large { width:112px; height:112px; margin:0 auto 20px; }

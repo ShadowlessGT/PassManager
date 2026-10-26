@@ -6,13 +6,13 @@ $studio='C:\Program Files\Android\Android Studio\bin\studio64.exe'
 $jbr='C:\Program Files\Android\Android Studio\jbr'
 $sdk=Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 $appVersion=(Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
-$destination=Join-Path 'H:\Meine Ablage\Sharing\APKs' ("PassManager-v" + $appVersion + "-debug.apk")
+$destination=Join-Path 'H:\Meine Ablage\Sharing\APKs' ("Parola-v" + $appVersion + "-debug.apk")
 function Stage([string]$name,[scriptblock]$action){
   Write-Host ('['+(Get-Date -Format 'HH:mm:ss')+'] '+$name)
   & $action
   if($LASTEXITCODE -ne 0){throw "$name failed (exit code $LASTEXITCODE)"}
 }
-Write-Host 'PassManager LOCAL Android build (NO GitHub Actions)'
+Write-Host 'Parola LOCAL Android build (NO GitHub Actions)'
 if(!(Get-Command npm.cmd -ErrorAction SilentlyContinue)){
   if(Get-Command winget -ErrorAction SilentlyContinue){
     winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
