@@ -1,4 +1,4 @@
-package eu.shadowlessstudios.passmanager;
+package com.chilleristudios.passwortmanager;
 
 import com.getcapacitor.BridgeActivity;
 

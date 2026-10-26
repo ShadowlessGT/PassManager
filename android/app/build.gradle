@@ -1,14 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "eu.shadowlessstudios.passmanager"
+    namespace = "com.chilleristudios.passwortmanager"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "eu.shadowlessstudios.passmanager"
+        applicationId "com.chilleristudios.passwortmanager"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "0.6.3"
+        versionCode 10
+        versionName "0.6.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

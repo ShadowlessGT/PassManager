@@ -824,7 +824,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Parola v0.6.3 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">Parola v0.6.4 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>

@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Parola</string>
     <string name="title_activity_main">Parola</string>
-    <string name="package_name">eu.shadowlessstudios.passmanager</string>
-    <string name="custom_url_scheme">eu.shadowlessstudios.passmanager</string>
+    <string name="package_name">com.chilleristudios.passwortmanager</string>
+    <string name="custom_url_scheme">com.chilleristudios.passwortmanager</string>
 </resources>

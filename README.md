@@ -1,3 +1,12 @@
+## Parola Android-ID und Firebase (26.10.2026)
+
+- App-Name: Parola; Android-Paket / Capacitor appId: `com.chilleristudios.passwortmanager`.
+- Firebase-Projekt: `password-manager-parola`. Android-App muss auf exakt diese Paket-ID registriert sein.
+- Lokale Firebase-Quelle: `H:\Meine Ablage\GoogleServicess Firebase\Parola\google-services.json`.
+- Android-Konfiguration: `android/app/google-services.json` (gitignored); Web-Konfiguration: `.env.local` (gitignored).
+- Eine alte Android-Installation mit `eu.shadowlessstudios.passmanager` ist eine **separate App**; ihre lokalen Passwortdaten werden nicht automatisch migriert. Vor Deinstallation immer ein verifiziertes verschluesseltes Backup/Restore testen.
+- APK lokal auf dem Windows-PC erstellen; keine GitHub Actions.
+
 ## v0.6.1 – System detection without a visible third theme
 - On first launch, auto-detect and follow Android light/dark mode.
 - Appearance settings offer only **Hell** and **Dunkel**. The auto-detected effective choice is shown as selected.
