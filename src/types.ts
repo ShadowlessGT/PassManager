@@ -118,5 +118,5 @@ export const blankEntry = (): VaultEntry => ({
   favorite: false,
   createdAt: Date.now(),
   updatedAt: Date.now(),
-  fields: [makeField('PIN', 'pin'), makeField('Adresse', 'multiline')]
+  fields: []
 });
