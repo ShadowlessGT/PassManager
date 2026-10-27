@@ -31,7 +31,7 @@ import type { EncryptedEnvelope } from './crypto';
 import { verifyCloudVault, vaultRevision } from './cloudSafety';
 import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
-import { cloudConfigured, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
+import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 
 type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
@@ -266,6 +266,7 @@ export default function App() {
   const [cloudUser, setCloudUser] = useState<string | null>(cloudEmail());
   const [cloudLoginEmail, setCloudLoginEmail] = useState('');
   const [cloudLoginPassword, setCloudLoginPassword] = useState('');
+  const [cloudDeletePassword, setCloudDeletePassword] = useState('');
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [restoreCandidate, setRestoreCandidate] = useState<EncryptedEnvelope | null>(null);
@@ -513,6 +514,23 @@ export default function App() {
       setNotice('Firebase-Konto verbunden');
     } catch { setCloudError('Anmeldung fehlgeschlagen. E-Mail und Passwort prüfen.'); }
     finally { setCloudBusy(false); }
+  }
+
+  async function deleteFirebaseAccount() {
+    if (!cloudUser || cloudBusy || !cloudDeletePassword) return;
+    if (window.prompt('Zur endgültigen Löschung deines Firebase-Kontos und aller Cloud-Daten LÖSCHEN eingeben:') !== 'LÖSCHEN') return;
+    setCloudBusy(true); setCloudError('');
+    try {
+      await cloudDeleteAccount(cloudDeletePassword);
+      setCloudUser(null);
+      setCloudDeletePassword('');
+      setNotice('Firebase-Konto und Cloud-Daten gelöscht. Dein lokaler Tresor bleibt erhalten.');
+    } catch {
+      setCloudError('Kontolöschung fehlgeschlagen. Prüfe Anmeldung und Serververbindung. Lokale Daten bleiben erhalten.');
+    } finally {
+      setCloudDeletePassword('');
+      setCloudBusy(false);
+    }
   }
 
   async function uploadCloud() {
@@ -807,6 +825,14 @@ export default function App() {
                 </div>
                 <p className="settings-note">Nur verschlüsselte Daten verlassen dein Gerät. Eine Wiederherstellung erfordert das Sicherungspasswort; die vorige lokale Version bleibt verschlüsselt erhalten. Die Sicherung läuft nicht automatisch.</p>
                 <button className="text-btn" onClick={() => void cloudSignOut().then(() => setCloudUser(null))}>Cloud-Konto abmelden</button>
+                <div className="cloud-delete-account">
+                  <strong>Firebase-Konto und Cloud-Daten löschen</strong>
+                  <p className="settings-note">Entfernt das Firebase-Konto und die gespeicherte Cloud-Sicherung endgültig. Der lokale, verschlüsselte Tresor bleibt auf diesem Gerät bestehen. Zur Bestätigung ist eine erneute Anmeldung erforderlich.</p>
+                  <label>Firebase-Kontopasswort
+                    <input type="password" autoComplete="current-password" value={cloudDeletePassword} onChange={event => setCloudDeletePassword(event.target.value)} placeholder="Kontopasswort zur Löschung"/>
+                  </label>
+                  <button type="button" className="danger-btn" disabled={cloudBusy || !cloudDeletePassword} onClick={() => void deleteFirebaseAccount()}>Firebase-Konto endgültig löschen</button>
+                </div>
               </> : <div className="cloud-login">
                 <label>E-Mail<input type="email" autoComplete="username" value={cloudLoginEmail} onChange={e => setCloudLoginEmail(e.target.value)} placeholder="name@beispiel.de"/></label>
                 <label>{simple ? 'Passwort für dein Sicherungskonto' : 'Firebase-Kontopasswort'}<input type="password" autoComplete="current-password" value={cloudLoginPassword} onChange={e => setCloudLoginPassword(e.target.value)} placeholder="Firebase-Passwort"/></label>
