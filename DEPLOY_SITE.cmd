@@ -43,8 +43,19 @@ call :menu_result %errorlevel%
 goto menu
 :menu_publish
 echo.
-echo ACHTUNG: Dateien im angegebenen Parola-Verzeichnis werden ueberschrieben.
-choice /c JN /n /m "Upload jetzt ausfuehren? (J/N): "
+echo [Parola] Pruefe FTPS und vergleiche die Server-Versionsdatei ...
+call :run_probe
+if errorlevel 1 (
+    echo.
+    echo Upload nicht begonnen. Bitte die obige Fehlermeldung beheben.
+    pause
+    goto menu
+)
+echo.
+echo Nur neue oder per SHA-256 geaenderte Dateien werden aktualisiert.
+echo Unveraenderte Dateien werden uebersprungen. Keine Remote-Dateien werden geloescht.
+echo Die Datei parola-deploy-manifest.json wird zuletzt aktualisiert.
+choice /c JN /n /m "Geaenderte Dateien jetzt hochladen? (J/N): "
 if errorlevel 2 goto menu
 call :run_publish
 call :menu_result %errorlevel%
