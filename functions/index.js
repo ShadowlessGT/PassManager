@@ -118,7 +118,8 @@ exports.redeemGiftCode = onCall(options, async request => {
  * A correct ID token never grants access to any other user's account.
  */
 const { removeOwnAccount } = require('./accountDeletion');
-exports.deleteOwnAccount = onCall({ region: 'europe-west3', enforceAppCheck: true }, async request => {
+// Deletion must also be accessible outside the Android app; recent reauthentication is mandatory.
+exports.deleteOwnAccount = onCall({ region: 'europe-west3', enforceAppCheck: false }, async request => {
   const uid = requireUser(request);
   if (request.data?.confirm !== 'DELETE') {
     throw new HttpsError('invalid-argument', 'Bitte Kontolöschung ausdrücklich bestätigen.');
