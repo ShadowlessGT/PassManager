@@ -111,3 +111,26 @@ exports.redeemGiftCode = onCall(options, async request => {
 
 // Google Play purchases must NOT be granted by this endpoint. Play Billing purchases
 // require a separate verified Google Play Developer API token pipeline.
+
+
+/**
+ * Parola account deletion, callable only with a fresh Firebase sign-in and App Check.
+ * A correct ID token never grants access to any other user's account.
+ */
+const { removeOwnAccount } = require('./accountDeletion');
+exports.deleteOwnAccount = onCall({ region: 'europe-west3', enforceAppCheck: true }, async request => {
+  const uid = requireUser(request);
+  if (request.data?.confirm !== 'DELETE') {
+    throw new HttpsError('invalid-argument', 'Bitte Kontolöschung ausdrücklich bestätigen.');
+  }
+  const authTime = Number(request.auth.token.auth_time || 0);
+  const elapsed = Math.floor(Date.now() / 1000) - authTime;
+  if (!authTime || elapsed < 0 || elapsed > 300) {
+    throw new HttpsError('failed-precondition', 'Bitte erneut anmelden und Kontolöschung wiederholen.');
+  }
+  try { return await removeOwnAccount(uid); }
+  catch (error) {
+    console.error('Account removal failed', error?.name || 'unknown');
+    throw new HttpsError('internal', 'Kontolöschung fehlgeschlagen. Bitte erneut versuchen.');
+  }
+});
