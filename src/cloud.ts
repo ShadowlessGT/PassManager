@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { getFirestore, doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc, runTransaction, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { EncryptedEnvelope } from './crypto';
 
@@ -60,14 +60,33 @@ export function onCloudEmailChange(callback: (email: string | null) => void): ()
   return auth ? onAuthStateChanged(auth, user => callback(user?.email ?? null)) : () => {};
 }
 
-/** Deletes only the current Firebase account; locally encrypted vault remains available. */
+/** Deletes the signed-in user's Firebase account. Never touches the local encrypted vault.
+ * While Functions cannot run on Spark, clients may delete only their own Firestore documents.
+ * Accounts with server-assigned premium entitlements must wait for privileged server cleanup.
+ */
 export async function cloudDeleteAccount(accountPassword: string): Promise<void> {
   const user = auth?.currentUser;
-  if (!user?.email || !app) throw new Error('Bitte zuerst mit deinem Firebase-Konto anmelden.');
+  if (!user?.email || !db) throw new Error('Bitte zuerst bei Firebase anmelden.');
   if (!accountPassword) throw new Error('Kontopasswort erforderlich.');
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, accountPassword));
-  const remove = httpsCallable<{ confirm: string }, { deleted: boolean }>(getFunctions(app, 'europe-west3'), 'deleteOwnAccount');
-  const response = await remove({ confirm: 'DELETE' });
-  if (!response.data.deleted) throw new Error('Kontolöschung nicht bestätigt.');
+  const uid = user.uid;
+
+  if (import.meta.env.VITE_DELETE_ACCOUNT_BACKEND === 'functions') {
+    if (!app) throw new Error('Firebase fehlt.');
+    const remove = httpsCallable<{ confirm: string }, { deleted: boolean }>(
+      getFunctions(app, 'europe-west3'), 'deleteOwnAccount');
+    const response = await remove({ confirm: 'DELETE' });
+    if (!response.data.deleted) throw new Error('Kontolöschung nicht bestätigt.');
+    await signOut(auth!);
+    return;
+  }
+
+  const entitlement = await getDoc(doc(db, 'accessEntitlements', uid));
+  if (entitlement.exists()) throw new Error('SERVER_CLEANUP_REQUIRED: Premium-Berechtigung vorhanden.');
+  // The account is deleted LAST, so a failed Firestore operation can be retried
+  // with the existing Firebase credentials. All documents are scoped to this UID.
+  await deleteDoc(doc(db, 'vaults', uid));
+  await deleteDoc(doc(db, 'redemptionAttempts', uid));
+  await deleteUser(user);
   await signOut(auth!);
 }
