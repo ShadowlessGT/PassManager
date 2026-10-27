@@ -11,6 +11,8 @@ import { newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFie
 import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
 import LicensePanel from './LicensePanel';
+import { lookupLicense } from './license';
+import { freeEntryEditError } from './featureGate';
 import InsightsPanel from './InsightsPanel';
 import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
@@ -74,11 +76,12 @@ type EditorProps = {
   categories: VaultCategory[];
   people: string[];
   simple: boolean;
+  ultra: boolean;
   onClose: () => void;
   onSave: (entry: VaultEntry) => Promise<void>;
 };
 
-function EntryEditor({ entry, categories, people, simple, onClose, onSave }: EditorProps) {
+function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave }: EditorProps) {
   const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -163,10 +166,10 @@ function EntryEditor({ entry, categories, people, simple, onClose, onSave }: Edi
         <form className="editor-form" onSubmit={submit}>
           <div className="form-section-title">Grundinformationen</div>
           <label>Name <span className="required">*</span><input autoFocus value={draft.title} onChange={e => update('title', e.target.value)} placeholder="z. B. Netflix, Gmail, WLAN..." maxLength={120}/></label>
-          {!simple && <label>Beschreibung<input value={draft.description} onChange={e => update('description', e.target.value)} placeholder="Wofür wird dieser Zugang verwendet?"/></label>}
+          {!simple && ultra && <label>Beschreibung<input value={draft.description} onChange={e => update('description', e.target.value)} placeholder="Wofür wird dieser Zugang verwendet?"/></label>}
           <div className="form-section-title">Zugangsdaten</div>
           <label>Benutzername<input autoComplete="off" value={draft.username} onChange={e => update('username', e.target.value)} placeholder="Benutzername"/></label>
-          {!simple && <label>E-Mail-Adresse<input autoComplete="off" inputMode="email" value={draft.email} onChange={e => update('email', e.target.value)} placeholder="name@beispiel.de"/></label>}
+          {<label>E-Mail-Adresse<input autoComplete="off" inputMode="email" value={draft.email} onChange={e => update('email', e.target.value)} placeholder="name@beispiel.de"/></label>}
           <label>Passwort
             <div className="field-with-actions">
               <input autoComplete="new-password" type={showPassword ? 'text' : 'password'} value={draft.password} onChange={e => update('password', e.target.value)} placeholder="Passwort"/>
@@ -174,8 +177,8 @@ function EntryEditor({ entry, categories, people, simple, onClose, onSave }: Edi
               <button className="field-action" type="button" title="Sicheres Passwort generieren" onClick={() => { update('password', generatePassword()); setShowPassword(true); }}><Sparkles size={19}/></button>
             </div>
           </label>
-          {!simple && <>
           <label>Homepage / URL<input value={draft.website} onChange={e => update('website', e.target.value)} placeholder="https://beispiel.de"/></label>
+          {!simple && ultra && <>
           <label className="check-line"><input type="checkbox" checked={Boolean(draft.keepPasswordHistory)}
             onChange={e => update('keepPasswordHistory', e.target.checked)}/>
             <span>Frühere Passwörter verschlüsselt aufbewahren (max. 10, optional)</span>
@@ -219,7 +222,7 @@ function EntryEditor({ entry, categories, people, simple, onClose, onSave }: Edi
           <label>Person / Besitzer<input list="people-list" value={draft.person} onChange={e => update('person', e.target.value)} placeholder="z. B. Familie"/><datalist id="people-list">{people.map(person => <option key={person} value={person}/>)}</datalist></label>
           </>}
           <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
-          {!simple && <>
+          {!simple && ultra && <>
           <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>
           <div className="form-section-title">Bilder und Anhänge</div>
           <p className="input-help">Bilder werden zusammen mit dem gesamten Tresor verschlüsselt. Maximal 3 Bilder à 500 KB.</p>
@@ -267,6 +270,7 @@ export default function App() {
   const [cloudLoginEmail, setCloudLoginEmail] = useState('');
   const [cloudLoginPassword, setCloudLoginPassword] = useState('');
   const [cloudDeletePassword, setCloudDeletePassword] = useState('');
+  const [ultra, setUltra] = useState(false);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [restoreCandidate, setRestoreCandidate] = useState<EncryptedEnvelope | null>(null);
@@ -283,6 +287,14 @@ export default function App() {
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => {
+    let active = true;
+    setUltra(false);
+    if (cloudUser) void lookupLicense()
+      .then(grant => { if (active) setUltra(grant.active); })
+      .catch(() => { if (active) setUltra(false); });
+    return () => { active = false; };
+  }, [cloudUser]);
   useEffect(() => {
     // Follow Android's theme dynamically while no manual override is selected.
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -431,6 +443,10 @@ export default function App() {
     await mutateVault(current => {
       const previous = current.entries.find(value => value.id === entry.id);
       existed = Boolean(previous);
+      if (!ultra) {
+        const accessError = freeEntryEditError(previous, entry);
+        if (accessError) throw new Error(accessError);
+      }
       const replacement = trackPasswordHistory(previous, { ...entry, activity: previous?.activity ?? entry.activity });
       const withEntry = { ...current, entries: previous
         ? current.entries.map(value => value.id === entry.id ? replacement : value)
@@ -785,6 +801,12 @@ export default function App() {
               </div>
             </section>
             {!simple && <>
+            <section className="settings-card">
+              <div className="settings-heading"><div><h2>Parola {ultra ? 'Ultra' : 'Free'}</h2>
+              <p>{ultra ? 'Ultra-Funktionen für dieses Firebase-Konto freigeschaltet.' :
+                'Unbegrenzte Zugänge mit Name, E-Mail, Benutzername und Passwort. Erweiterte Felder und Bilder gehören zu Ultra.'}</p></div></div>
+              {!ultra && <p className="settings-note">Google Play Billing wird vorbereitet. Vorhandene Zusatzdaten bleiben erhalten und lesbar.</p>}
+            </section>
             <LicensePanel/>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span><div><h2>Passwörter importieren</h2><p>CSV und Excel (.xlsx) von anderen Passwort-Managern und Tabellen.</p></div></div>
@@ -930,7 +952,7 @@ export default function App() {
       </div>}
       {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} simple={simple} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
-      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} onClose={() => setEditing(null)} onSave={saveEntry}/>}
+      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} ultra={ultra} onClose={() => setEditing(null)} onSave={saveEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>
   );
