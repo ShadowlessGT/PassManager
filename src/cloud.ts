@@ -52,7 +52,7 @@ export async function cloudDownload(): Promise<EncryptedEnvelope | null> {
   const snapshot = await getDoc(doc(db!, 'vaults', uid));
   if (!snapshot.exists()) return null;
   const envelope = snapshot.data().envelope as EncryptedEnvelope;
-  if (!envelope || envelope.v !== 1 || typeof envelope.ciphertext !== 'string') throw new Error('Ungültige Cloud-Daten.');
+  if (!envelope || envelope.v !== 1 || typeof envelope.ciphertext !== 'string') throw new Error('UngÃ¼ltige Cloud-Daten.');
   return envelope;
 }
 
@@ -76,7 +76,7 @@ export async function cloudDeleteAccount(accountPassword: string): Promise<void>
     const remove = httpsCallable<{ confirm: string }, { deleted: boolean }>(
       getFunctions(app, 'europe-west3'), 'deleteOwnAccount');
     const response = await remove({ confirm: 'DELETE' });
-    if (!response.data.deleted) throw new Error('Kontolöschung nicht bestätigt.');
+    if (!response.data.deleted) throw new Error('KontolÃ¶schung nicht bestÃ¤tigt.');
     await signOut(auth!);
     return;
   }
@@ -86,7 +86,7 @@ export async function cloudDeleteAccount(accountPassword: string): Promise<void>
   // The account is deleted LAST, so a failed Firestore operation can be retried
   // with the existing Firebase credentials. All documents are scoped to this UID.
   await deleteDoc(doc(db, 'vaults', uid));
-  await deleteDoc(doc(db, 'redemptionAttempts', uid));
+
   await deleteUser(user);
   await signOut(auth!);
 }

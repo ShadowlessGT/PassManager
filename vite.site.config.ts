@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 export default defineConfig({
   root: resolve(process.cwd(), 'site'),
   envDir: process.cwd(),
-  publicDir: false,
+  publicDir: resolve(process.cwd(), 'site/public'),
   build: {
     target: 'es2022',
     outDir: resolve(process.cwd(), 'site-dist'),

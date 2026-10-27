@@ -1,43 +1,44 @@
 {
-  "name": "passmanager",
-  "private": true,
-  "version": "0.6.7",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "android:init": "npm run build && npx cap add android",
-    "android:sync": "npm run build && npx cap sync android",
-    "android:open": "npx cap open android",
-    "test": "vitest run",
-    "test:rules": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-firestore-rules.ps1"
-  },
-  "dependencies": {
-    "@aparajita/capacitor-biometric-auth": "^10.0.0",
-    "@aparajita/capacitor-secure-storage": "^8.0.1",
-    "@capacitor-mlkit/text-recognition": "^8.2.1",
-    "@capacitor/android": "8.5.2",
-    "@capacitor/app": "^8.0.0",
-    "@capacitor/camera": "^8.1.0",
-    "@capacitor/clipboard": "^8.0.0",
-    "@capacitor/core": "8.5.2",
-    "@capacitor/filesystem": "^8.1.0",
-    "@capacitor/privacy-screen": "^2.0.1",
-    "firebase": "^12.0.0",
-    "lucide-react": "^0.468.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "read-excel-file": "^9.3.12"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "8.5.2",
-    "@firebase/rules-unit-testing": "^5.0.0",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "^5.9.0",
-    "vite": "^7.1.0",
-    "vitest": "^3.2.0"
-  }
+    "name": "passmanager",
+    "private": true,
+    "version": "0.6.8",
+    "type": "module",
+    "scripts": {
+        "dev": "vite --host 0.0.0.0",
+        "build": "tsc --noEmit && vite build",
+        "preview": "vite preview",
+        "android:init": "npm run build && npx cap add android",
+        "android:sync": "npm run build && npx cap sync android",
+        "android:open": "npx cap open android",
+        "test": "vitest run",
+        "test:rules": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-firestore-rules.ps1",
+        "build:site": "vite build --config vite.site.config.ts"
+    },
+    "dependencies": {
+        "@aparajita/capacitor-biometric-auth": "^10.0.0",
+        "@aparajita/capacitor-secure-storage": "^8.0.1",
+        "@capacitor-mlkit/text-recognition": "^8.2.1",
+        "@capacitor/android": "8.5.2",
+        "@capacitor/app": "^8.0.0",
+        "@capacitor/camera": "^8.1.0",
+        "@capacitor/clipboard": "^8.0.0",
+        "@capacitor/core": "8.5.2",
+        "@capacitor/filesystem": "^8.1.0",
+        "@capacitor/privacy-screen": "^2.0.1",
+        "firebase": "^12.0.0",
+        "lucide-react": "^0.468.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "read-excel-file": "^9.3.12"
+    },
+    "devDependencies": {
+        "@capacitor/cli": "8.5.2",
+        "@firebase/rules-unit-testing": "^5.0.0",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "@vitejs/plugin-react": "^5.0.0",
+        "typescript": "^5.9.0",
+        "vite": "^7.1.0",
+        "vitest": "^3.2.0"
+    }
 }

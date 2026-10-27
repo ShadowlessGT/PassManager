@@ -22,6 +22,8 @@ await assertFails(getDoc(doc(owner,'redeemCodes','test')));
 await assertFails(getDoc(doc(owner,'redemptionAttempts','owner')));
 await assertFails(setDoc(vaultOwner,{envelope:{...envelope(),nonce:'short'},updatedAt:serverTimestamp()}));
 await assertFails(setDoc(vaultOwner,{envelope:envelope(),updatedAt:new Date(0)}));
+await assertFails(deleteDoc(doc(stranger, 'redemptionAttempts', 'owner')));
+await assertFails(deleteDoc(doc(owner, 'redemptionAttempts', 'owner')));
 await assertSucceeds(deleteDoc(vaultOwner));
-console.log('PASS: 15 Firestore security rule assertions');
+console.log('PASS: 17 Firestore security rule assertions');
 } finally { await env.cleanup(); }

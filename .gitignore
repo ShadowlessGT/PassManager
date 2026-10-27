@@ -451,3 +451,6 @@ android/gradle-local.err
 *.keystore
 *.p12
 *.pem
+
+/deploy.local.env
+/site-dist/

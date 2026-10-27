@@ -31,11 +31,7 @@ service cloud.firestore {
     }
     // Raw codes are never stored; hashed redemption records and rate limits are server-private.
     match /redeemCodes/{codeHash} { allow read, write: if false; }
-    match /redemptionAttempts/{uid} {
-      allow read, create, update: if false;
-      // Account owner may only delete their own rate-limit record on account removal.
-      allow delete: if request.auth != null && request.auth.uid == uid;
-    }
+    match /redemptionAttempts/{uid} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
