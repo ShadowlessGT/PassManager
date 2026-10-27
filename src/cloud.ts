@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { getFirestore, doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { EncryptedEnvelope } from './crypto';
 
 const firebaseConfig = {
@@ -57,4 +58,16 @@ export async function cloudDownload(): Promise<EncryptedEnvelope | null> {
 
 export function onCloudEmailChange(callback: (email: string | null) => void): () => void {
   return auth ? onAuthStateChanged(auth, user => callback(user?.email ?? null)) : () => {};
+}
+
+/** Deletes only the current Firebase account; locally encrypted vault remains available. */
+export async function cloudDeleteAccount(accountPassword: string): Promise<void> {
+  const user = auth?.currentUser;
+  if (!user?.email || !app) throw new Error('Bitte zuerst mit deinem Firebase-Konto anmelden.');
+  if (!accountPassword) throw new Error('Kontopasswort erforderlich.');
+  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, accountPassword));
+  const remove = httpsCallable<{ confirm: string }, { deleted: boolean }>(getFunctions(app, 'europe-west3'), 'deleteOwnAccount');
+  const response = await remove({ confirm: 'DELETE' });
+  if (!response.data.deleted) throw new Error('Kontolöschung nicht bestätigt.');
+  await signOut(auth!);
 }
