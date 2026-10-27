@@ -82,7 +82,7 @@ def main() -> int:
         for path in files:
             print("  " + path.relative_to(DIST).as_posix())
         if needed:
-            print("\\nFTP-Konfiguration unvollständig: " + ", ".join(needed))
+            print("\nFTP-Konfiguration unvollständig: " + ", ".join(needed))
             print("Lokale Datei: " + str(ENV))
             print("In Hostinger > FTP-Konten den Benutzer und das Document-Root der Parola-Subdomain nachschlagen.")
             print("Danach: DEPLOY_SITE.cmd probe  (Verbindung prüfen)")
