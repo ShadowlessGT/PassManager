@@ -114,6 +114,25 @@ class DeployManifestTests(unittest.TestCase):
         order = deploy.sorted_uploads(["index.html", "delete-account.html", "assets/style.css"])
         self.assertEqual(order, ["assets/style.css", "delete-account.html", "index.html"])
 
+    def test_failed_transfer_does_not_advance_main_manifest(self):
+        initial = self.local()
+        deploy.upload(self.ftp, self.ftp.pwd(), initial, None, self.site)
+        (self.site / "index.html").write_text("<title>Broken update</title>")
+        changed = self.local()
+        old_manifest = deploy.read_manifest(self.ftp)
+        self.assertNotEqual(old_manifest["releaseId"], changed["releaseId"])
+        original = self.ftp.storbinary
+
+        def broken_stor(command, stream):
+            if command == "STOR index.html":
+                raise OSError("simulated upload failure")
+            original(command, stream)
+
+        self.ftp.storbinary = broken_stor
+        with self.assertRaisesRegex(OSError, "simulated upload failure"):
+            deploy.upload(self.ftp, self.ftp.pwd(), changed, old_manifest, self.site)
+        self.assertEqual(deploy.read_manifest(self.ftp), old_manifest)
+
     def test_corrupt_remote_manifest_fails_closed(self):
         self.ftp.files["/parola/parola-deploy-manifest.json"] = b"<not-json>"
         with self.assertRaisesRegex(RuntimeError, "ungültig"):
