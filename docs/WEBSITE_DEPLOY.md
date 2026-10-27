@@ -18,3 +18,43 @@ The currently used Firebase project is `password-manager-parola`. Spark is activ
 **Release blockers**: Privacy text is a marked draft pending legal controller details, DPA and support contact. Do not use this site in a final Play Console submission until these details and actual account removal are verified. Google Play's deletion URL can be `https://parola.shadowless-studios.eu/delete-account.html` after release verification.
 
 Only the website (`site-dist/`) is uploaded. Firebase Functions remain separate and are deployed with `firebase deploy --only functions:deleteOwnAccount` once billing and permissions are enabled and tests pass.
+
+## Versioned incremental deployments
+
+The website has a **single latest-release file**, `parola-deploy-manifest.json`,
+generated locally in `site-dist/` and uploaded to the Parola web directory only
+after every modified file was transferred and its SHA-256 hash rechecked.
+
+- The manifest stores the npm app version, a content-based release ID, each
+  relative file name, file size and SHA-256 hash.
+- The `probe` command reads the remote manifest without writing and reports
+  exactly which files would change. Choosing upload in the interactive menu
+  performs this check **before** the confirmation prompt.
+- After confirmation, files with matching hashes are **skipped**. Only new
+  or changed website files are transferred. Static hashed asset files are
+  uploaded before HTML; `index.html` is sent last among the pages.
+- A release snapshot goes into the remote `deploy-history/` directory.
+  The main version file is uploaded **last**. Old assets are not automatically
+  deleted; to roll back pages, retrieve the previous site files from your own
+  retained build/source history (the manifest itself is only metadata).
+- On a first deployment without a remote manifest, all seven website files
+  are uploaded once; subsequent runs are incremental.
+- Never place credentials in the manifest or GitHub. Avoid manually modifying
+  site files on the server, because the remote version file would then be stale.
+
+## Certificate hostname error
+
+If FTPS says `CERTIFICATE_VERIFY_FAILED: Hostname mismatch`, the
+`ftp.shadowless-studios.eu` alias is not covered by the FTP server's
+TLS certificate. A read-only diagnosis on 27 October 2026 identified a
+certificate for `*.hstgr.io`. **Do not disable TLS certificate validation**
+and do not switch to insecure FTP to bypass the warning.
+
+In Hostinger hPanel, open **Websites > Dashboard > Plan Details** or
+**Files > FTP Accounts** and copy the **actual server hostname** from that
+hosting plan into `HOSTINGER_FTP_HOST` inside the local
+`deploy.local.env` file. Do not invent a `*.hstgr.io` subdomain.
+Then choose **[3] connection probe** before **[4] publish**. A correct
+hostname and a certificate-valid connection are required before the
+script sends the FTP password.
+
