@@ -289,11 +289,15 @@ export default function App() {
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   useEffect(() => {
     let active = true;
+    const refresh = () => {
+      if (!cloudUser) { setUltra(false); return; }
+      void lookupLicense().then(grant => { if (active) setUltra(grant.active); })
+        .catch(() => { if (active) setUltra(false); });
+    };
     setUltra(false);
-    if (cloudUser) void lookupLicense()
-      .then(grant => { if (active) setUltra(grant.active); })
-      .catch(() => { if (active) setUltra(false); });
-    return () => { active = false; };
+    refresh();
+    window.addEventListener('parola-license-changed', refresh);
+    return () => { active = false; window.removeEventListener('parola-license-changed', refresh); };
   }, [cloudUser]);
   useEffect(() => {
     // Follow Android's theme dynamically while no manual override is selected.
