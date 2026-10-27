@@ -60,28 +60,54 @@ def check_target(target: str):
 def main() -> int:
     parser = argparse.ArgumentParser(description="Parola Website lokal auf Hostinger bereitstellen")
     parser.add_argument("--publish", action="store_true", help="Dateien tatsächlich hochladen")
+    parser.add_argument("--probe", action="store_true", help="FTP-Verbindung und Zielverzeichnis nur lesend prüfen")
     args = parser.parse_args()
-    env = load_env(ENV)
-    target = check_target(env.get("HOSTINGER_FTP_TARGET", ""))
-    host = env.get("HOSTINGER_FTP_HOST", "")
-    port = int(env.get("HOSTINGER_FTP_PORT") or 21)
-    protocol = env.get("HOSTINGER_FTP_PROTOCOL", "ftps").lower()
-    if not host or protocol not in {"ftp", "ftps", "ftps-legacy"}:
-        raise RuntimeError("FTP-Host oder Protokoll ungültig.")
-    if protocol == "ftp" and env.get("HOSTINGER_ALLOW_INSECURE_FTP") != "true":
-        raise RuntimeError("Unverschlüsseltes FTP blockiert. Bitte ftps verwenden.")
+    if args.publish and args.probe:
+        raise RuntimeError("Bitte nur --publish oder --probe benutzen.")
     files = files_to_upload()
-    print(f"Ziel: {host}:{port}/{target} | Protokoll: {protocol}")
-    print(f"Website-Dateien: {len(files)} (ohne Löschung bestehender Remote-Dateien)")
-    if not args.publish:
+    env = load_env(ENV) if ENV.is_file() else {}
+    host = env.get("HOSTINGER_FTP_HOST", "").strip()
+    target_raw = env.get("HOSTINGER_FTP_TARGET", "").strip()
+    user = env.get("HOSTINGER_FTP_USER", "").strip()
+    password = env.get("HOSTINGER_FTP_PASSWORD", "")
+    protocol = env.get("HOSTINGER_FTP_PROTOCOL", "ftps").strip().lower()
+    needed = [key for key, val in (
+        ("HOSTINGER_FTP_HOST", host),
+        ("HOSTINGER_FTP_USER", user),
+        ("HOSTINGER_FTP_PASSWORD", password),
+        ("HOSTINGER_FTP_TARGET", target_raw)
+    ) if not val]
+    if not args.publish and not args.probe:
+        print(f"Parola Website-Vorschau: {len(files)} Dateien (kein Upload)")
         for path in files:
             print("  " + path.relative_to(DIST).as_posix())
-        print("Nur Vorschau. Für Upload: DEPLOY_SITE.cmd publish")
+        if needed:
+            print("\\nFTP-Konfiguration unvollständig: " + ", ".join(needed))
+            print("Lokale Datei: " + str(ENV))
+            print("In Hostinger > FTP-Konten den Benutzer und das Document-Root der Parola-Subdomain nachschlagen.")
+            print("Danach: DEPLOY_SITE.cmd probe  (Verbindung prüfen)")
+        else:
+            print(f"Konfiguriertes FTP-Ziel: {host}/{target_raw} ({protocol})")
+        print("Für den echten Upload: DEPLOY_SITE.cmd publish")
         return 0
-    user = env.get("HOSTINGER_FTP_USER")
-    password = env.get("HOSTINGER_FTP_PASSWORD")
-    if not user or not password:
-        raise RuntimeError("FTP-Benutzername/Passwort fehlen in deploy.local.env.")
+    if needed:
+        raise RuntimeError(
+            "FTP-Konfiguration unvollständig: " + ", ".join(needed) +
+            ". Bitte " + str(ENV) + " lokal ausfüllen. "
+            "Hostinger > Websites > Dashboard > FTP-Konten; "
+            "FTP-Zielverzeichnis der Parola-Subdomain überprüfen. "
+            "Es wurde nichts hochgeladen."
+        )
+    target = check_target(target_raw)
+    try:
+        port = int(env.get("HOSTINGER_FTP_PORT") or "21")
+    except ValueError as exc:
+        raise RuntimeError("HOSTINGER_FTP_PORT muss eine Zahl sein.") from exc
+    if protocol not in {"ftp", "ftps", "ftps-legacy"}:
+        raise RuntimeError("HOSTINGER_FTP_PROTOCOL muss ftp, ftps oder ftps-legacy sein.")
+    if protocol == "ftp" and env.get("HOSTINGER_ALLOW_INSECURE_FTP") != "true":
+        raise RuntimeError("Unverschlüsseltes FTP blockiert. Bitte ftps verwenden.")
+    print(f"Verbindung zu {host}:{port}, Parola-Ziel {target} ({protocol})")
     context = ssl.create_default_context()
     ftp = (ImplicitFTP_TLS(context=context, timeout=30)
            if protocol == "ftps-legacy" else
@@ -100,6 +126,11 @@ def main() -> int:
         # Existing remote directory only. Never mkdir, delete or change other sites.
         for segment in target.split("/"):
             ftp.cwd(segment)
+        if args.probe:
+            print("FTP-Verbindung erfolgreich. Zielverzeichnis erreichbar.")
+            print("Server-Verzeichnis: " + ftp.pwd())
+            print("Lesender Test abgeschlossen. Keine Dateien verändert.")
+            return 0
         for file in files:
             parts = file.relative_to(DIST).parts
             folder = parts[:-1]
