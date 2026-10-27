@@ -40,7 +40,7 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
     setBusy(true); setStatus('');
     try {
       const grant = await redeemGiftCode(code.trim());
-      setCode(''); setInfo(grant.lifetime ? 'Pro dauerhaft aktiv' : 'Pro bis ' + new Date(grant.expiresAt!).toLocaleDateString('de-DE'));
+      setCode(''); window.dispatchEvent(new Event('parola-license-changed')); setInfo(grant.lifetime ? 'Pro dauerhaft aktiv' : 'Pro bis ' + new Date(grant.expiresAt!).toLocaleDateString('de-DE'));
       setStatus('Freischaltcode erfolgreich eingelöst.');
     } catch { setStatus('Einlösen fehlgeschlagen. Code, Login und Firebase App Check prüfen.'); }
     finally { setBusy(false); }
