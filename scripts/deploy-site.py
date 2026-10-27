@@ -252,6 +252,9 @@ def main() -> int:
         raise RuntimeError("--probe und --publish dürfen nicht kombiniert werden.")
 
     local = build_manifest()
+    # Keep the same central version file locally for inspection and packaging.
+    # build_manifest deliberately excludes this file from the content hashes.
+    (DIST / MANIFEST).write_bytes(encoded_manifest(local))
     env = load_env(ENV)
     required = ["HOSTINGER_FTP_HOST", "HOSTINGER_FTP_USER", "HOSTINGER_FTP_PASSWORD",
                 "HOSTINGER_FTP_TARGET"]
