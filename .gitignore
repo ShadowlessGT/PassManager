@@ -445,3 +445,9 @@ android/gradle-local.err
 /.env.local
 /android/app/google-services.json
 /.firebase-web-sdk-config.json
+
+/android/signing.properties
+*.jks
+*.keystore
+*.p12
+*.pem
