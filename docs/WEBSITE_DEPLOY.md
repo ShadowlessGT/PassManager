@@ -58,3 +58,44 @@ Then choose **[3] connection probe** before **[4] publish**. A correct
 hostname and a certificate-valid connection are required before the
 script sends the FTP password.
 
+
+## Hostinger SFTP (recommended)
+
+Parola supports **SFTP over SSH** as well as FTPS. In the local
+`deploy.local.env`, select:
+
+```ini
+HOSTINGER_FTP_HOST=191.96.63.25
+HOSTINGER_FTP_PORT=65002
+HOSTINGER_FTP_PROTOCOL=sftp
+HOSTINGER_FTP_USER=<SSH username from Hostinger SSH Access>
+HOSTINGER_FTP_PASSWORD=<SSH/FTP password, local only>
+HOSTINGER_FTP_TARGET=<confirmed Parola document root>
+HOSTINGER_SFTP_HOSTKEY_SHA256=<verified SSH host key fingerprint>
+```
+
+The variables retain the `HOSTINGER_FTP_` prefix for compatibility; their
+`sftp` setting selects **SSH**, not FTP. The first connection is refused
+until `HOSTINGER_SFTP_HOSTKEY_SHA256` matches the remote SHA256 fingerprint.
+Use the one shown in **Hostinger > SSH Access**. The probe prints the
+received fingerprint *before password authentication*, for comparison.
+Do not trust an unexpected fingerprint or save an unverified key.
+SSH access must be enabled in Hostinger hPanel.
+
+The main SSH account username is typically the account shown in SSH Access
+(e.g. `u969889962`). A separately created FTP-only username such as
+`u969889962.shadowlessgt` may not work for SFTP. Use the SSH Access
+screen as the authority for the username.
+
+The target `/parola/` is normalized to the relative directory
+`parola` under the SSH/SFTP login home. **It is not proven to be the
+document root for `parola.shadowless-studios.eu`.** Verify the subdomain
+root in Hostinger's file manager before publishing.
+
+The Windows deploy script installs `paramiko` once with pip when SFTP is
+selected and the package is missing. FTPS and offline preview require
+no additional Python dependencies.
+
+Run `DEPLOY_SITE.cmd probe` for a **read-only connection** and version
+comparison. After successful verification, `DEPLOY_SITE.cmd publish`
+uploads only changed files, then updates the remote version manifest last.
