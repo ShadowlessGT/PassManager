@@ -98,7 +98,15 @@ async function refreshPlayEntitlement(uid, db = getFirestore(), api = { readPlay
   }
   const token = userToken.data().purchaseToken;
   const entitlementRef = db.doc('accessEntitlements/' + uid);
-  const purchase = await api.readPlayPurchase(token);
+  let purchase;
+  try {
+    purchase = await api.readPlayPurchase(token);
+  } catch (error) {
+    // Play returns 404 when a formerly owned purchase is no longer valid.
+    // Do NOT revoke on network errors, auth failures, or quota exhaustion.
+    if (error?.status !== 404) throw error;
+    purchase = { purchaseStateContext: { purchaseState: 'CANCELLED' }, productLineItem: [] };
+  }
   let active = false;
   try { validatePurchase(purchase, uid); active = true; }
   catch (error) {
