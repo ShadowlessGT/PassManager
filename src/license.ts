@@ -11,7 +11,7 @@ function firebase() {
   return getApp();
 }
 
-export async function lookupLicense(): Promise<{ active: boolean; lifetime: boolean; expiresAt: number | null }> {
+export async function lookupLicense(): Promise<{ active: boolean; lifetime: boolean; expiresAt: number | null; source?: string }> {
   const app = firebase();
   const uid = getAuth(app).currentUser?.uid;
   if (!uid) return { active: false, lifetime: false, expiresAt: null };
@@ -20,7 +20,7 @@ export async function lookupLicense(): Promise<{ active: boolean; lifetime: bool
   if (!snapshot.exists()) return { active: false, lifetime: false, expiresAt: null };
   const grant = snapshot.data() as AccessEntitlement;
   const expiresAt = grant.expiresAt?.toMillis?.() ?? null;
-  return { active: grant.tier === 'pro' && (!expiresAt || expiresAt > Date.now()), lifetime: grant.tier === 'pro' && !expiresAt, expiresAt };
+  return { active: grant.tier === 'pro' && (!expiresAt || expiresAt > Date.now()), lifetime: grant.tier === 'pro' && !expiresAt, expiresAt, source: grant.source };
 }
 
 export async function redeemGiftCode(code: string): Promise<{ active: boolean; lifetime: boolean; expiresAt: number | null }> {
