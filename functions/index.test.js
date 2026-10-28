@@ -6,7 +6,10 @@ const { removeOwnAccount } = require('./accountDeletion');
 function mock() {
   const actions = [];
   const db = {
-    doc: path => ({ delete: async () => { actions.push('delete:' + path); } }),
+    doc: path => ({
+      get: async () => ({ exists: false }),
+      delete: async () => { actions.push('delete:' + path); }
+    }),
     collection: collection => ({
       where: field => ({
         get: async () => ({ docs: [
@@ -24,7 +27,7 @@ test('delete current account removes vault, licence and spent codes before authe
   assert.deepEqual(await removeOwnAccount('tester', db, auth), { deleted: true });
   assert.deepEqual(actions, [
     'delete:vaults/tester', 'delete:accessEntitlements/tester',
-    'delete:redemptionAttempts/tester', 'update:createdBy',
+    'delete:redemptionAttempts/tester', 'delete:playTokensByUser/tester', 'update:createdBy',
     'remove-spent:redeemedBy', 'auth:tester'
   ]);
 });
