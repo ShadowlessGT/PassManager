@@ -65,7 +65,7 @@ h3{font-size:clamp(1.35rem,1.9vw,1.8rem)}
 .hero-section{position:relative;isolation:isolate;overflow:hidden;padding-bottom:24px}
 .hero-section::before{content:"";position:absolute;z-index:-1;pointer-events:none;inset:0;background:radial-gradient(ellipse 45% 52% at 83% 39%,rgba(35,141,251,.12),transparent 74%),radial-gradient(ellipse 49% 67% at 68% 57%,rgba(5,191,226,.075),transparent 80%)}
 .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:20px;align-items:center;min-height:680px;padding-block:55px 58px}
-.hero-content{position:relative;z-index:2;padding-bottom:12px}
+.hero-content{position:relative;z-index:2;padding-bottom:12px;min-width:0}
 .hero h1{font-size:clamp(3.5rem,5.65vw,5.65rem);line-height:1.055;margin:25px 0 26px;font-weight:830;white-space:nowrap}
 .hero h1 span{background:linear-gradient(105deg,#085de4 3%,#0b8bee 48%,#08b8d4 100%);background-clip:text;-webkit-background-clip:text;color:transparent}
 :root[data-theme="dark"] .hero h1 span{background-image:linear-gradient(105deg,#64a8ff,#24c8e4)}
@@ -227,7 +227,7 @@ h3{font-size:clamp(1.35rem,1.9vw,1.8rem)}
 @media(max-width:770px){
  .top{min-height:74px}.brand-name strong{font-size:1.12rem}
  .menu>a:not(.nav-secondary):not(.pill){display:none}.menu{gap:10px}
- .hero{grid-template-columns:1fr;min-height:0;padding-block:76px 25px;gap:5px}
+ .hero{grid-template-columns:minmax(0,1fr);min-height:0;padding-block:76px 25px;gap:5px}
  .hero-content{text-align:center}
  .hero h1{white-space:normal;font-size:clamp(3.35rem,8vw,4.7rem);margin:21px 0}
  .eyebrow{justify-content:center}.lead{margin-inline:auto}
@@ -248,15 +248,15 @@ h3{font-size:clamp(1.35rem,1.9vw,1.8rem)}
 }
 @media(max-width:560px){
  .wrap{width:calc(100% - 36px)}
- .top{min-height:70px;gap:10px}.brand{gap:6px}.brand img{width:35px;height:35px}.brand-name strong{font-size:1.04rem}.brand-name small{font-size:.61rem}
- .menu{gap:6px}.menu .nav-secondary,.menu .pill{font-size:.71rem;padding:8px 9px}.theme-toggle{font-size:0;gap:0;padding:10px;width:39px;justify-content:center}.theme-icon{width:16px;height:16px}
+ .top{min-height:70px;gap:10px;min-width:0}.brand{gap:6px}.brand img{width:35px;height:35px}.brand-name strong{font-size:1.04rem}.brand-name small{font-size:.61rem}
+ .menu{gap:6px;min-width:0}.menu .nav-secondary,.menu .pill{font-size:.71rem;padding:8px 9px}.theme-toggle{font-size:0;gap:0;padding:10px;width:39px;justify-content:center}.theme-icon{width:16px;height:16px}
  .hero{padding-top:60px}
- .hero h1{font-size:clamp(2.9rem,11.2vw,4rem)}
+ .hero h1{font-size:clamp(2.2rem,8.8vw,3.15rem);overflow-wrap:normal}
  .eyebrow{font-size:.62rem;letter-spacing:.1em}
  .lead{font-size:1.02rem}
  .actions{display:grid;grid-template-columns:1fr;gap:10px}.btn{min-height:52px}
- .hero-meta{font-size:.74rem;gap:6px}
- .hero-art{min-height:530px}
+ .hero-meta{font-size:.74rem;gap:6px;flex-wrap:wrap;line-height:1.5}
+ .hero-art{min-height:530px;max-width:100%;overflow:visible}
  .phone-shell{transform:scale(.86) rotate(2deg)}
  .float-card{padding:9px 10px}.float-card strong{font-size:.72rem}.float-card small{font-size:.61rem}.float-icon{height:28px;width:28px}.float-card-left{top:25%;left:-4px}.float-card-right{right:-3px;bottom:21%}
  .orbit{width:360px;height:360px}.orbit-two{width:440px;height:440px}
