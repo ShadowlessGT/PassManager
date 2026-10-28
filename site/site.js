@@ -2,7 +2,9 @@
 const root = document.documentElement;
 const query = window.matchMedia('(prefers-color-scheme: dark)');
 const storageKey = 'parola-site-theme';
+let volatileTheme = null;
 function readPreferredTheme() {
+  if (volatileTheme) return volatileTheme;
   try {
     const stored = window.localStorage.getItem(storageKey);
     return stored === 'light' || stored === 'dark' ? stored : null;
@@ -31,7 +33,8 @@ function toggleTheme() {
   const active = root.dataset.theme || (query.matches ? 'dark' : 'light');
   try { window.localStorage.setItem(storageKey, active === 'dark' ? 'light' : 'dark'); }
   catch {
-    root.dataset.theme = active === 'dark' ? 'light' : 'dark';
+    // Browsers that block localStorage can still switch themes for this visit.
+    volatileTheme = active === 'dark' ? 'light' : 'dark';
     return applyTheme();
   }
   applyTheme();
