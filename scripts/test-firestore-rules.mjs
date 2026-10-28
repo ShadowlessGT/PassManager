@@ -24,6 +24,10 @@ await assertFails(setDoc(vaultOwner,{envelope:{...envelope(),nonce:'short'},upda
 await assertFails(setDoc(vaultOwner,{envelope:envelope(),updatedAt:new Date(0)}));
 await assertFails(deleteDoc(doc(stranger, 'redemptionAttempts', 'owner')));
 await assertFails(deleteDoc(doc(owner, 'redemptionAttempts', 'owner')));
+await assertFails(getDoc(doc(owner, 'playPurchases', 'fakehash')));
+await assertFails(setDoc(doc(owner, 'playPurchases', 'fakehash'), { uid: 'owner' }));
+await assertFails(getDoc(doc(owner, 'playTokensByUser', 'owner')));
+await assertFails(setDoc(doc(owner, 'playTokensByUser', 'owner'), { purchaseToken: 'forged' }));
 await assertSucceeds(deleteDoc(vaultOwner));
-console.log('PASS: 17 Firestore security rule assertions');
+console.log('PASS: 21 Firestore security rule assertions');
 } finally { await env.cleanup(); }
