@@ -64,8 +64,14 @@ class VerifiedSFTP:
             import paramiko
             self.sftp = paramiko.SFTPClient.from_transport(self.transport)
             self.current = self.sftp.normalize(".")
-        except Exception:
+        except Exception as error:
             self.close()
+            if type(error).__name__ in {"AuthenticationException", "BadAuthenticationType", "PartialAuthentication"}:
+                raise RuntimeError(
+                    "SFTP-Anmeldung abgelehnt. Bitte in Hostinger > SSH-Zugang "
+                    "pruefen, dass SSH/SFTP aktiviert ist und der FTP/SSH-Hauptbenutzer "
+                    "(nicht nur ein separates FTP-Unterkonto) und das SSH-Passwort stimmen."
+                ) from error
             raise
 
     def set_pasv(self, value: bool) -> None:
