@@ -15,9 +15,9 @@ echo =====================================================
 echo    Passwort Manager: Parola - Website Deployment
 echo =====================================================
 echo.
-echo [1] FTP-Einstellungen oeffnen
+echo [1] SFTP/FTPS-Einstellungen oeffnen
 echo [2] Website lokal bauen und Vorschau zeigen
-echo [3] FTP-Verbindung und Zielverzeichnis pruefen
+echo [3] SFTP/FTPS-Verbindung und Zielverzeichnis pruefen
 echo [4] Website auf Hostinger hochladen
 echo [0] Beenden
 echo.
@@ -96,7 +96,7 @@ if not exist "deploy.local.env" (
 )
 echo.
 echo Lokale Datei: %CD%\deploy.local.env
-echo Bitte FTP-Benutzer, FTP-Passwort und das EXAKTE Parola-Zielverzeichnis
+echo Bitte SSH/FTP-Benutzer, Passwort und das EXAKTE Parola-Zielverzeichnis
 echo aus Hostinger hinterlegen. Diese Datei NICHT nach GitHub hochladen.
 start "" notepad.exe "%CD%\deploy.local.env"
 exit /b 0
