@@ -135,3 +135,35 @@ exports.deleteOwnAccount = onCall({ region: 'europe-west3', enforceAppCheck: fal
     throw new HttpsError('internal', 'Kontolöschung fehlgeschlagen. Bitte erneut versuchen.');
   }
 });
+
+
+/**
+ * Google Play Billing 9 purchase token verification.
+ * The client cannot grant Ultra by itself; Firestore entitlements are server-only.
+ * Authentication and Play Publisher API verification are both mandatory.
+ * App Check enforcement can be enabled after Android Play Integrity attestation is proven.
+ */
+const { verifyPlayPurchase, refreshPlayEntitlement } = require('./playPurchase');
+exports.verifyPlayPurchase = onCall({
+  region: 'europe-west3', enforceAppCheck: false, maxInstances: 3
+}, async request => {
+  const uid = requireUser(request);
+  try {
+    return await verifyPlayPurchase(uid, request.data?.purchaseToken);
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    console.error('Google Play verification failed:', error?.status || error?.name || 'unknown');
+    throw new HttpsError('unavailable', 'Google Play konnte den Kauf derzeit nicht verifizieren.');
+  }
+});
+exports.refreshPlayEntitlement = onCall({
+  region: 'europe-west3', enforceAppCheck: false, maxInstances: 3
+}, async request => {
+  const uid = requireUser(request);
+  try {
+    return await refreshPlayEntitlement(uid);
+  } catch (error) {
+    console.error('Google Play entitlement refresh failed:', error?.status || error?.name || 'unknown');
+    throw new HttpsError('unavailable', 'Google Play kann den Lizenzstatus derzeit nicht prüfen.');
+  }
+});
