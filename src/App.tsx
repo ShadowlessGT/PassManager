@@ -12,6 +12,7 @@ import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
 import LicensePanel from './LicensePanel';
 import { lookupLicense } from './license';
+import { checkPlayLicenseServer } from './playBilling';
 import { freeEntryEditError } from './featureGate';
 import InsightsPanel from './InsightsPanel';
 import QuickAdd from './QuickAdd';
@@ -299,6 +300,19 @@ export default function App() {
     window.addEventListener('parola-license-changed', refresh);
     return () => { active = false; window.removeEventListener('parola-license-changed', refresh); };
   }, [cloudUser]);
+  // Revalidate server-linked Play grants when the Firebase account changes.
+  // Network outages never create an Ultra grant or erase a previously saved grant.
+  useEffect(() => {
+    if (!cloudUser) return;
+    let active = true;
+    void lookupLicense().then(async license => {
+      if (active && license.source === 'google_play') {
+        await checkPlayLicenseServer();
+      }
+    }).catch(() => { /* offline: retain the last server-saved state */ });
+    return () => { active = false; };
+  }, [cloudUser]);
+
   useEffect(() => {
     // Follow Android's theme dynamically while no manual override is selected.
     const media = window.matchMedia('(prefers-color-scheme: dark)');
