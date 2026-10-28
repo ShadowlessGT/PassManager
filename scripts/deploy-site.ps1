@@ -36,6 +36,25 @@ if ($Probe) { $deployArgs += '--probe' }
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw 'Python wurde nicht gefunden. Bitte Python installieren und in PATH aufnehmen.'
 }
+# Password-based SFTP uses Paramiko. Install only when the local config selects SFTP;
+# the uploader itself still performs strict SSH host-key fingerprint verification.
+$config = Join-Path $root 'deploy.local.env'
+if ((Test-Path -LiteralPath $config) -and
+    (Select-String -Path $config -Pattern '^\s*HOSTINGER_FTP_PROTOCOL\s*=\s*sftp\s*
+if ($LASTEXITCODE -ne 0) {
+    Write-Host 'Tipp: DEPLOY_SITE.cmd setup oeffnet die lokale FTP-Konfiguration.' -ForegroundColor Yellow
+    exit 1
+}
+ -Quiet)) {
+    $paramikoInstalled = & python -m pip show paramiko 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '[Parola] SFTP benoetigt Paramiko. Installiere Python-Paket einmalig ...' -ForegroundColor Yellow
+        & python -m pip install --user 'paramiko>=3.5,<5' --disable-pip-version-check
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Paramiko-Installation fehlgeschlagen. Bitte Python/pip pruefen.'
+        }
+    }
+}
 & python @deployArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'Tipp: DEPLOY_SITE.cmd setup oeffnet die lokale FTP-Konfiguration.' -ForegroundColor Yellow
