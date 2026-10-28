@@ -86,3 +86,19 @@ test('refund removes only a Google Play entitlement, not a gift', async () => {
   });
   assert.equal(db.snapshot('accessEntitlements/' + uid).exists, true);
 });
+
+test('verified 404 refund revokes Play grant but network failures do not', async () => {
+  const db = new MockDb();
+  db.records.set('playTokensByUser/' + uid, { purchaseToken: token });
+  db.records.set('accessEntitlements/' + uid, {
+    tier: 'pro', source: 'google_play', tokenHash: hash(token)
+  });
+  await assert.rejects(refreshPlayEntitlement(uid, db, {
+    readPlayPurchase: async () => { throw Object.assign(new Error('offline'), { status: 503 }); }
+  }), /offline/);
+  assert.equal(db.snapshot('accessEntitlements/' + uid).exists, true);
+  await refreshPlayEntitlement(uid, db, {
+    readPlayPurchase: async () => { throw Object.assign(new Error('not found'), { status: 404 }); }
+  });
+  assert.equal(db.snapshot('accessEntitlements/' + uid).exists, false);
+});
