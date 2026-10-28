@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Gift, ShieldCheck } from 'lucide-react';
+import PlayBillingPanel from './PlayBillingPanel';
 import { cloudConfigured, cloudSignIn } from './cloud';
 import { adminCreateCodes, isAdmin, lookupLicense, redeemGiftCode } from './license';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -23,7 +24,7 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
     return onAuthStateChanged(getAuth(getApp()), user => {
       setLoggedIn(Boolean(user)); setAdmin(false); setGenerated([]);
       if (user) {
-        void lookupLicense().then(x => setInfo(x.active ? x.lifetime ? 'Pro dauerhaft aktiv' : 'Pro bis ' + new Date(x.expiresAt!).toLocaleDateString('de-DE') : 'Keine aktive Pro-Lizenz')).catch(() => setInfo('Lizenzstatus nicht verfügbar.'));
+        void lookupLicense().then(x => setInfo(x.active ? x.lifetime ? 'Ultra dauerhaft aktiv' : 'Ultra bis ' + new Date(x.expiresAt!).toLocaleDateString('de-DE') : 'Keine aktive Ultra-Lizenz')).catch(() => setInfo('Lizenzstatus nicht verfügbar.'));
         void isAdmin().then(setAdmin).catch(() => setAdmin(false));
       } else setInfo('');
     });
@@ -59,9 +60,10 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
 
   return <section className={compact ? 'license-compact' : 'settings-card'}>
     <div className="settings-heading"><span className="settings-icon"><Gift size={21}/></span><div>
-      <h2>{compact ? 'Freischaltcode vorhanden?' : 'Pro-Lizenz & Freischaltcodes'}</h2>
+      <h2>{compact ? 'Freischaltcode vorhanden?' : 'Parola Ultra & Freischaltcodes'}</h2>
       <p>Kostenlose Geschenkcodes mit Firebase-Konto einlösen.</p>
     </div></div>
+    {!compact && <PlayBillingPanel loggedIn={loggedIn}/>}
     {!loggedIn ? <div className="cloud-login">
       <label>E-Mail<input type="email" autoComplete="username" placeholder="name@beispiel.de" value={email} onChange={e => setEmail(e.target.value)}/></label>
       <label>Kontopasswort<input type="password" autoComplete="current-password" value={pass} onChange={e => setPass(e.target.value)}/></label>
