@@ -136,11 +136,14 @@ def goto_target(ftp: ftplib.FTP, target: str) -> str:
     return ftp.pwd()
 
 
-def ftp_client(host: str, port: int, protocol: str, env: dict) -> ftplib.FTP:
-    if protocol not in {"ftps", "ftps-legacy", "ftp"}:
-        raise RuntimeError("Ungültiges FTP-Protokoll.")
+def ftp_client(host: str, port: int, protocol: str, env: dict):
+    if protocol not in {"sftp", "ftps", "ftps-legacy", "ftp"}:
+        raise RuntimeError("Unbekanntes Protokoll. Erlaubt: sftp, ftps, ftps-legacy oder ftp.")
+    if protocol == "sftp":
+        from parola_sftp import VerifiedSFTP
+        return VerifiedSFTP(env.get("HOSTINGER_SFTP_HOSTKEY_SHA256", ""))
     if protocol == "ftp" and env.get("HOSTINGER_ALLOW_INSECURE_FTP") != "true":
-        raise RuntimeError("Unverschlüsseltes FTP blockiert. FTPS verwenden.")
+        raise RuntimeError("Unverschlüsseltes FTP blockiert. Bitte SFTP oder FTPS verwenden.")
     if protocol == "ftp":
         return ftplib.FTP(timeout=30)
     ctx = ssl.create_default_context()
@@ -244,9 +247,9 @@ def upload(ftp: ftplib.FTP, target_root: str,
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Parola: versionierter FTPS-Upload")
+    parser = argparse.ArgumentParser(description="Parola: versionierter SFTP-/FTPS-Upload")
     parser.add_argument("--publish", action="store_true", help="Nur geänderte Dateien hochladen")
-    parser.add_argument("--probe", action="store_true", help="Read-only FTPS & Manifest vergleichen")
+    parser.add_argument("--probe", action="store_true", help="Read-only SFTP/FTPS & Manifest vergleichen")
     args = parser.parse_args()
     if args.probe and args.publish:
         raise RuntimeError("--probe und --publish dürfen nicht kombiniert werden.")
@@ -266,7 +269,7 @@ def main() -> int:
         for name in local["files"]:
             print(f"  {name} ({local['files'][name]['sha256'][:12]})")
         if missing:
-            print("FTPS-Einstellungen fehlen: " + ", ".join(missing))
+            print("SFTP-/FTPS-Einstellungen fehlen: " + ", ".join(missing))
             print("DEPLOY_SITE.cmd setup öffnet die lokale Konfiguration.")
         else:
             print("Mit DEPLOY_SITE.cmd probe den Serverstand lesend vergleichen.")
@@ -274,7 +277,7 @@ def main() -> int:
         return 0
     if missing:
         raise RuntimeError(
-            "FTPS-Konfiguration unvollständig: " + ", ".join(missing) +
+            "SFTP-/FTPS-Konfiguration unvollständig: " + ", ".join(missing) +
             ". DEPLOY_SITE.cmd setup verwenden; es wurde nichts hochgeladen."
         )
     host = env["HOSTINGER_FTP_HOST"].strip()
@@ -283,7 +286,7 @@ def main() -> int:
     target = check_target(env["HOSTINGER_FTP_TARGET"])
     protocol = env.get("HOSTINGER_FTP_PROTOCOL", "ftps").strip().lower()
     try:
-        port = int(env.get("HOSTINGER_FTP_PORT") or "21")
+        port = int(env.get("HOSTINGER_FTP_PORT") or ("65002" if protocol == "sftp" else "21"))
     except ValueError as error:
         raise RuntimeError("HOSTINGER_FTP_PORT muss eine Zahl sein.") from error
 
