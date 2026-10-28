@@ -12,6 +12,17 @@ async function removeOwnAccount(uid, db = getFirestore(), auth = getAuth()) {
   await db.doc('vaults/' + uid).delete();
   await db.doc('accessEntitlements/' + uid).delete();
   await db.doc('redemptionAttempts/' + uid).delete();
+  // Remove the authenticated account's own purchase binding. The actual
+  // Google Play purchase remains owned by its Google account and can be
+  // restored to a new Firebase account after verified checkout.
+  const tokenRef = db.doc('playTokensByUser/' + uid);
+  const saved = await tokenRef.get();
+  if (saved.exists && saved.data()?.tokenHash) {
+    const claimRef = db.doc('playPurchases/' + saved.data().tokenHash);
+    const claim = await claimRef.get();
+    if (claim.exists && claim.data()?.uid === uid) await claimRef.delete();
+  }
+  await tokenRef.delete();
   const created = await db.collection('redeemCodes').where('createdBy', '==', uid).get();
   for (const record of created.docs) await record.ref.update({ createdBy: null });
   const redeemed = await db.collection('redeemCodes').where('redeemedBy', '==', uid).get();
