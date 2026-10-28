@@ -32,6 +32,10 @@ service cloud.firestore {
     // Raw codes are never stored; hashed redemption records and rate limits are server-private.
     match /redeemCodes/{codeHash} { allow read, write: if false; }
     match /redemptionAttempts/{uid} { allow read, write: if false; }
+    // Google Play purchase tokens are server secrets; even the owner cannot
+    // read or modify them. Only Admin SDK functions may bind/revoke a token.
+    match /playPurchases/{purchaseHash} { allow read, write: if false; }
+    match /playTokensByUser/{uid} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
