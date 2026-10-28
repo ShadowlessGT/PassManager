@@ -1,15 +1,18 @@
 {
-  "name": "passmanager-firebase-functions",
-  "private": true,
-  "version": "0.1.0",
-  "engines": { "node": "22" },
-  "main": "index.js",
-  "scripts": {
-    "check": "node --check index.js",
-    "test": "node --test index.test.js"
-  },
-  "dependencies": {
-    "firebase-admin": "^13.5.0",
-    "firebase-functions": "^7.0.0"
-  }
+    "name":  "passmanager-firebase-functions",
+    "private":  true,
+    "version":  "0.1.0",
+    "engines":  {
+                    "node":  "22"
+                },
+    "main":  "index.js",
+    "scripts":  {
+                    "check":  "node --check index.js \u0026\u0026 node --check playPurchase.js \u0026\u0026 node --check accountDeletion.js",
+                    "test":  "node --test index.test.js playPurchase.test.js"
+                },
+    "dependencies":  {
+                         "firebase-admin":  "^13.5.0",
+                         "firebase-functions":  "^7.0.0",
+                         "google-auth-library":  "^10.5.0"
+                     }
 }

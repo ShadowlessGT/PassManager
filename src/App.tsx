@@ -890,7 +890,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Passwort Manager: Parola v0.6.8 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">Passwort Manager: Parola v0.6.9 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
