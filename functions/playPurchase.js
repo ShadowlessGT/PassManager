@@ -48,9 +48,11 @@ function validatePurchase(purchase, uid) {
   const state = purchase.purchaseStateContext?.purchaseState;
   if (state === 'PENDING') throw new HttpsError('failed-precondition', 'Zahlung noch ausstehend.');
   if (state !== 'PURCHASED') throw new HttpsError('failed-precondition', 'Kauf nicht aktiv.');
-  if (purchase.obfuscatedExternalAccountId &&
+  // All newly initiated Parola purchases set an obfuscated Firebase account ID.
+  // Missing IDs must not allow a leaked purchase token to be claimed by anyone.
+  if (!purchase.obfuscatedExternalAccountId ||
       purchase.obfuscatedExternalAccountId !== hash(uid)) {
-    throw new HttpsError('permission-denied', 'Kauf gehört einem anderen Firebase-Konto.');
+    throw new HttpsError('permission-denied', 'Kauf ist nicht an dieses Firebase-Konto gebunden.');
   }
   return true;
 }
