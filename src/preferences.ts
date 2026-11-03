@@ -1,9 +1,12 @@
+import type { LanguagePreference } from './i18n';
+import { normalizeLanguagePreference } from './i18n';
 export type UiMode = 'simple' | 'expert';
 export type Appearance = 'system' | 'light' | 'dark';
 export type TextSize = 'normal' | 'large' | 'extra-large';
 export type UserPreferences = {
   mode: UiMode;
   appearance: Appearance;
+  language: LanguagePreference;
   textSize: TextSize;
   backgroundLockMs: number;
   idleLockMs: number;
@@ -23,6 +26,7 @@ export const IDLE_OPTIONS = LOCK_OPTIONS.filter(item => item.value !== 0);
 export const DEFAULT_PREFERENCES: UserPreferences = {
   mode: 'simple',
   appearance: 'system',
+  language: 'system',
   textSize: 'large',
   backgroundLockMs: 5 * 60_000,
   idleLockMs: 15 * 60_000
@@ -37,6 +41,7 @@ export function normalizePreferences(raw: unknown): UserPreferences {
   return {
     mode: source.mode === 'expert' ? 'expert' : 'simple',
     appearance: source.appearance === 'light' || source.appearance === 'dark' ? source.appearance : 'system',
+    language: normalizeLanguagePreference(source.language),
     textSize: source.textSize === 'normal' || source.textSize === 'extra-large' ? source.textSize : 'large',
     backgroundLockMs: validBackground ? source.backgroundLockMs! : DEFAULT_PREFERENCES.backgroundLockMs,
     idleLockMs: validIdle ? source.idleLockMs! : DEFAULT_PREFERENCES.idleLockMs
