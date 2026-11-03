@@ -27,6 +27,7 @@ import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCatego
 import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
 import type { UserPreferences } from './preferences';
 import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from './theme';
+import { SUPPORTED_LANGUAGES, applyLanguage, currentLanguage, resolveLanguage, useTranslate } from './i18n';
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
@@ -45,6 +46,7 @@ const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
   { id: 'settings', label: 'Einstellungen', icon: Settings2 }
 ];
 
+const NAV_TEXT = { vault: 'nav.vault', favorites: 'nav.favorites', categories: 'nav.categories', people: 'nav.categories', insights: 'nav.insights', settings: 'nav.settings' } as const;
 const generatePassword = generateStrongPassword;
 
 function safeUrl(value: string): string | null {
@@ -56,7 +58,7 @@ function safeUrl(value: string): string | null {
 }
 
 function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('de-DE', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(timestamp).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 async function fileAsDataUrl(file: File): Promise<string> {
@@ -83,6 +85,7 @@ type EditorProps = {
 };
 
 function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave }: EditorProps) {
+  const t = useTranslate();
   const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -161,7 +164,7 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
       <section className="sheet" role="dialog" aria-modal="true" aria-label="Passwort bearbeiten">
         <header className="sheet-header">
           <button className="icon-btn" type="button" onClick={onClose} aria-label="Schließen"><ArrowLeft size={20}/></button>
-          <h2>{entry.title ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</h2>
+          <h2>{entry.title ? 'Eintrag bearbeiten' : t('vault.new')}</h2>
           <button className="icon-btn" type="button" onClick={onClose} aria-label="Schließen"><X size={20}/></button>
         </header>
         <form className="editor-form" onSubmit={submit}>
@@ -236,7 +239,7 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
           {simple && <p className="input-help">Tipp: Unter Einstellungen kannst du jederzeit in den Experten-Modus wechseln, um zusätzliche Felder zu bearbeiten.</p>}
           {error && <p className="error-box" role="alert">{error}</p>}
           <div className="sheet-actions">
-            <button type="button" className="secondary-btn" onClick={onClose}>Abbrechen</button>
+            <button type="button" className="secondary-btn" onClick={onClose}>{t('common.cancel')}</button>
             <button type="submit" className="primary-btn" disabled={saving}>{saving ? 'Wird verschlüsselt...' : 'Sicher speichern'} <Check size={17}/></button>
           </div>
         </form>
@@ -246,6 +249,7 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
 }
 
 export default function App() {
+  const t = useTranslate();
   const [loading, setLoading] = useState(true);
   const [hasVault, setHasVault] = useState(false);
   const [data, setData] = useState<VaultData | null>(null);
@@ -288,6 +292,7 @@ export default function App() {
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => { applyLanguage(preferences.language); }, [preferences.language]);
   useEffect(() => {
     let active = true;
     const refresh = () => {
@@ -656,6 +661,14 @@ export default function App() {
     <main className="lock-layout">
       <div className="lock-glow"/>
       <section className="lock-card">
+        <label className="gate-language-picker"><Globe2 size={17}/>
+          <span className="sr-only">{t('ui.language')}</span>
+          <select aria-label={t('ui.language')} value={preferences.language}
+            onChange={event => setPreferences(previous => ({...previous, language: event.target.value as UserPreferences['language']}))}>
+            <option value="system">{t('ui.auto')}</option>
+            {SUPPORTED_LANGUAGES.map(item => <option key={item.code} value={item.code}>{item.nativeName}</option>)}
+          </select>
+        </label>
         <div className="brand-icon large"><img src="/parola-icon.png" alt="Parola" /></div>
         <p className="eyebrow parola-gate-title">PASSWORT MANAGER: PAROLA</p>
         <h1>{hasVault ? <>Dein Tresor.<br/><span>Sicher geschützt.</span></> : <>Deine Passwörter.<br/><span>Einfach aufbewahrt.</span></>}</h1>
@@ -682,7 +695,7 @@ export default function App() {
             </label>
           </>}
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
-          <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? 'Tresor entsperren' : 'Sicheren Tresor erstellen'} <ArrowLeft className="arrow-right" size={18}/></button>
+          <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? t('auth.unlock') : t('auth.create')} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
         {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck öffnen</button>}
 
@@ -692,7 +705,7 @@ export default function App() {
     </main>
   );
 
-  const sectionTitle = tab === 'vault' ? 'Mein Tresor' : NAV.find(item => item.id === tab)?.label || 'Mein Tresor';
+  const sectionTitle = tab === 'vault' ? t('vault.my') : t(NAV_TEXT[tab]);
   const showEntries = tab === 'vault' || tab === 'favorites' || (tab === 'categories' && categoryFilter) || (tab === 'people' && personFilter);
 
   return (
@@ -701,13 +714,13 @@ export default function App() {
         <header className="topbar">
           <div className="brand-line"><div className="brand-icon"><img src="/parola-icon.png" alt="" /></div><div><strong>Passwort Manager: <span>Parola</span></strong><small>SHADOWLESS STUDIOS</small></div></div>
           <div className="top-actions">
-            <span className="security-indicator"><span className="status-dot"/> Verschlüsselt</span>
+            <span className="security-indicator"><span className="status-dot"/> {t('vault.encrypted')}</span>
             {!simple && <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
               aria-label={'Zu ' + (simple ? 'Experten-Modus' : 'Einfach-Modus') + ' wechseln'}
               onClick={() => setPreferences(old => ({...old, mode: old.mode === 'simple' ? 'expert' : 'simple'}))}>
-              <SlidersHorizontal size={15}/> {simple ? 'Einfach' : 'Experte'}
+              <SlidersHorizontal size={15}/> {simple ? t('ui.simple') : t('ui.expert')}
             </button>}
-            <button type="button" className="icon-btn" onClick={lockVault} title="Tresor sperren" aria-label="Tresor sperren"><LockKeyhole size={20}/></button>
+            <button type="button" className="icon-btn" onClick={lockVault} title={t('vault.lock')} aria-label={t('vault.lock')}><LockKeyhole size={20}/></button>
           </div>
         </header>
 
@@ -776,28 +789,50 @@ export default function App() {
                   </div>
                 </article>
               ))}
-              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? 'Keine Treffer gefunden' : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Tippe auf „Neues Passwort speichern“, um deinen ersten Zugang anzulegen.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setShowQuickAdd(true)}><Plus size={17}/> Passwort speichern</button>}</div>}
+              {filtered.length === 0 && <div className="empty-state"><KeyRound size={34}/><h3>{query ? t('vault.noResults') : 'Hier ist noch alles frei'}</h3><p>{query ? 'Versuche einen anderen Suchbegriff.' : 'Tippe auf „Neues Passwort speichern“, um deinen ersten Zugang anzulegen.'}</p>{!query && <button className="secondary-btn" type="button" onClick={() => setShowQuickAdd(true)}><Plus size={17}/> Passwort speichern</button>}</div>}
             </div>
           </>}
 
           {tab === 'settings' && <div className="settings-layout">
+            <section className="settings-card language-card">
+              <div className="settings-heading">
+                <span className="settings-icon"><Globe2 size={22}/></span>
+                <div><h2>{t('ui.language')}</h2><p>{t('ui.languageHint')}</p></div>
+              </div>
+              <label className="language-select-label" htmlFor="parola-language">{t('ui.language')}</label>
+              <select id="parola-language" className="language-select"
+                value={preferences.language}
+                onChange={event => setPreferences(previous => ({
+                  ...previous, language: event.target.value as UserPreferences['language']
+                }))}>
+                <option value="system">{t('ui.auto')} · {SUPPORTED_LANGUAGES.find(item => item.code === resolveLanguage('system'))?.nativeName ?? 'English'}</option>
+                {SUPPORTED_LANGUAGES.map(item => <option key={item.code} value={item.code} lang={item.code} dir="auto">
+                  {item.nativeName} · {item.name}
+                </option>)}
+              </select>
+              <p className="settings-note" role="note">
+                {currentLanguage() === 'de'
+                  ? 'Die Übersetzung der gesamten App wird schrittweise ergänzt. Noch nicht übersetzte Bereiche erscheinen vorerst auf Deutsch.'
+                  : 'Translations across the entire app are being completed. Some screens may still appear in German.'}
+              </p>
+            </section>
             <section className="settings-card mode-card">
               <div className="settings-heading"><span className="settings-icon"><SlidersHorizontal size={22}/></span>
-                <div><h2>Bedienung</h2><p>Wähle die passende Oberfläche.</p></div>
+                <div><h2>{t('ui.mode')}</h2><p>{t('ui.modeHint')}</p></div>
               </div>
               <div className="mode-choice" role="group" aria-label="Bedienmodus">
                 <button className={simple ? 'active' : ''} type="button" aria-pressed={simple}
                   onClick={() => setPreferences(old => ({...old,mode:'simple'}))}>
-                  <strong>Einfach</strong><small>Wenige Schritte und gut lesbare Texte</small>
+                  <strong>{t('ui.simple')}</strong><small>Wenige Schritte und gut lesbare Texte</small>
                 </button>
                 <button className={!simple ? 'active' : ''} type="button" aria-pressed={!simple}
                   onClick={() => setPreferences(old => ({...old,mode:'expert'}))}>
-                  <strong>Experte</strong><small>Alle Funktionen und weitere Einstellungen</small>
+                  <strong>{t('ui.expert')}</strong><small>Alle Funktionen und weitere Einstellungen</small>
                 </button>
               </div>
               <p className="settings-note">Die Wahl ändert nur die Darstellung. Gespeicherte Zugangsdaten bleiben immer erhalten.</p>
               <div className="accessibility-options">
-                <div className="field-label">Darstellung</div>
+                <div className="field-label">{t('ui.appearance')}</div>
                 <div className="appearance-choice theme-choice" role="group" aria-label="Hell oder Dunkel wählen">
                   {APPEARANCE_CHOICES.map(([value,label])=><button key={value} type="button"
                     className={selectedAppearance === value ? 'active' : ''}
@@ -807,7 +842,7 @@ export default function App() {
                 <p className="settings-note">{preferences.appearance === 'system'
                   ? 'Die App übernimmt automatisch das Design deines Handys. Mit Hell oder Dunkel legst du eine eigene Auswahl fest.'
                   : 'Deine Auswahl bleibt gespeichert, auch wenn du die App schließt.'}</p>
-                <div className="field-label">Schriftgröße im Einfach-Modus</div>
+                <div className="field-label">{t('ui.fontSize')}</div>
                 <div className="appearance-choice" role="group" aria-label="Schriftgröße wählen">
                   {([
                     ['normal','Normal'],['large','Groß'],['extra-large','Sehr groß']
@@ -895,7 +930,7 @@ export default function App() {
         </main>
       </div>
 
-      <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.filter(item => !simple || ['vault','categories','settings'].includes(item.id)).map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{item.label}</span></button>; })}</nav>
+      <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.filter(item => !simple || ['vault','categories','settings'].includes(item.id)).map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{t(NAV_TEXT[item.id])}</span></button>; })}</nav>
 
       {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
