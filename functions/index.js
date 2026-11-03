@@ -9,7 +9,11 @@ const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestor
 initializeApp();
 const store = getFirestore();
 const hmacKey = defineSecret('PASSMANAGER_REDEMPTION_HMAC_KEY');
-const options = { region: 'europe-west3', enforceAppCheck: true, secrets: [hmacKey] };
+// The Android WebView has not yet integrated a native Firebase App Check
+// provider. Firebase Authentication, admin claims, server-only secrets and
+// per-user redemption rate limits remain mandatory. Re-enable App Check after
+// Play Integrity is fully configured and verified on release-track installs.
+const options = { region: 'europe-west3', enforceAppCheck: false, maxInstances: 3, secrets: [hmacKey] };
 
 function normalizeCode(code) {
   if (typeof code !== 'string') return '';
