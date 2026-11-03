@@ -48,7 +48,7 @@ const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
   { id: 'settings', label: 'Einstellungen', icon: Settings2 }
 ];
 
-const NAV_TEXT = { vault: 'nav.vault', favorites: 'nav.favorites', categories: 'nav.categories', people: 'nav.categories', insights: 'nav.insights', settings: 'nav.settings' } as const;
+const NAV_TEXT = { vault: 'nav.vault', favorites: 'nav.favorites', categories: 'nav.categories', people: 'vault.my', insights: 'nav.insights', settings: 'nav.settings' } as const;
 const generatePassword = generateStrongPassword;
 
 function safeUrl(value: string): string | null {
