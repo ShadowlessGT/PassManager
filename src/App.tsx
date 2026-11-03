@@ -292,7 +292,13 @@ export default function App() {
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
-  useEffect(() => { applyLanguage(preferences.language); }, [preferences.language]);
+  useEffect(() => {
+    const synchronize = () => applyLanguage(preferences.language);
+    synchronize();
+    // Android / browser system-language changes should update "Automatic" mode.
+    window.addEventListener('languagechange', synchronize);
+    return () => window.removeEventListener('languagechange', synchronize);
+  }, [preferences.language]);
   useEffect(() => {
     let active = true;
     const refresh = () => {
