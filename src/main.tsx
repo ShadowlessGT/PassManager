@@ -4,10 +4,13 @@ import App from './App';
 import { preparePrivacyScreen } from './device';
 import './styles.css';
 import { loadPreferences } from './preferences';
+import { applyLanguage } from './i18n';
 import { resolveAppearance, applyResolvedAppearance } from './theme';
 
 // Match the user's device before the first render to prevent a theme flash.
-const startAppearance = loadPreferences().appearance;
+const startupPreferences = loadPreferences();
+applyLanguage(startupPreferences.language);
+const startAppearance = startupPreferences.appearance;
 applyResolvedAppearance(resolveAppearance(startAppearance, window.matchMedia('(prefers-color-scheme: dark)').matches));
 
 void preparePrivacyScreen().catch(() => {
