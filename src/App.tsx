@@ -28,6 +28,8 @@ import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLock
 import type { UserPreferences } from './preferences';
 import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from './theme';
 import { SUPPORTED_LANGUAGES, applyLanguage, currentLanguage, resolveLanguage, useTranslate } from './i18n';
+import { lockText } from './lockI18n';
+import type { LockTextKey } from './lockI18n';
 import type { ActivityKind } from './types';
 import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
@@ -250,6 +252,7 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
 
 export default function App() {
   const t = useTranslate();
+  const l = (key: LockTextKey) => lockText(key, currentLanguage());
   const [loading, setLoading] = useState(true);
   const [hasVault, setHasVault] = useState(false);
   const [data, setData] = useState<VaultData | null>(null);
@@ -677,17 +680,17 @@ export default function App() {
         </label>
         <div className="brand-icon large"><img src="/parola-icon.png" alt="Parola" /></div>
         <p className="eyebrow parola-gate-title">PASSWORT MANAGER: PAROLA</p>
-        <h1>{hasVault ? <>Dein Tresor.<br/><span>Sicher geschützt.</span></> : <>Deine Passwörter.<br/><span>Einfach aufbewahrt.</span></>}</h1>
+        <h1>{hasVault ? <>{l('vaultHero')}<br/><span>{l('protectedHero')}</span></> : <>{l('passwordHero')}<br/><span>{l('simpleHero')}</span></>}</h1>
         <p className="lock-intro">{hasVault
-          ? 'Öffne deinen Tresor mit deinem Passwort oder deinem Fingerabdruck.'
-          : 'Lege jetzt ein Passwort für deinen persönlichen Tresor fest. Damit bleiben deine gespeicherten Zugänge geschützt.'}</p>
-        <div className="lock-pill"><LockKeyhole size={15}/> Deine Daten werden verschlüsselt gespeichert</div>
+          ? l('openIntro')
+          : l('createIntro')}</p>
+        <div className="lock-pill"><LockKeyhole size={15}/> {l('encryptedNotice')}</div>
         <form className="gate-form" onSubmit={gateSubmit}>
-          <label>{hasVault ? 'Dein Tresor-Passwort' : 'Passwort für deinen Tresor'}
+          <label>{hasVault ? l('existingPassword') : l('newPassword')}
             <span className="master-password-control">
               <input type={showMaster ? 'text' : 'password'} autoComplete={hasVault ? 'current-password' : 'new-password'}
                 value={master} onChange={e => setMaster(e.target.value)}
-                placeholder={hasVault ? 'Passwort eingeben' : 'Ab 6 Zeichen möglich'} />
+                placeholder={hasVault ? l('passwordPlaceholder') : l('minimumSix')} />
               <button type="button" className="master-visibility" onClick={() => setShowMaster(value => !value)}
                 aria-label={showMaster ? 'Passwort verbergen' : 'Passwort anzeigen'}>{showMaster ? <EyeOff size={19}/> : <Eye size={19}/>}</button>
             </span>
@@ -703,9 +706,9 @@ export default function App() {
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? t('auth.unlock') : t('auth.create')} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
-        {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> Mit Fingerabdruck öffnen</button>}
+        {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> {l('biometricOpen')}</button>}
 
-        <p className="lock-footnote">{hasVault ? 'Dein Tresor-Passwort bleibt auf deinem Gerät.' : 'Wichtig: Schreibe dir dein Tresor-Passwort an einem sicheren Ort auf. Ohne dieses Passwort sind die Daten nicht wiederherstellbar.'}</p>
+        <p className="lock-footnote">{hasVault ? l('existingFootnote') : l('newFootnote')}</p>
       </section>
       <footer className="lock-footer">Passwort Manager: Parola · by Shadowless Studios</footer>
     </main>
