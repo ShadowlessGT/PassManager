@@ -40,7 +40,8 @@ test('reject pending purchase without granting Ultra', async () => {
 });
 test('reject changed product and account mismatch', async () => {
   assert.throws(() => validatePurchase({ ...response(), productLineItem: [{ productId: 'other' }] }, uid));
-  assert.throws(() => validatePurchase(response('PURCHASED', hash('attacker')), uid), /anderen/);
+  assert.throws(() => validatePurchase(response('PURCHASED', hash('attacker')), uid), /gebunden/);
+  assert.throws(() => validatePurchase({ ...response(), obfuscatedExternalAccountId: undefined }, uid), /gebunden/);
 });
 test('verified purchased token grants lifetime, acknowledges and is idempotent', async () => {
   const db = new MockDb();
