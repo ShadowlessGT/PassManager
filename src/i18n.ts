@@ -8,7 +8,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ar', nativeName: 'العربية', name: 'Arabisch' },
   { code: 'fr', nativeName: 'Français', name: 'Französisch' },
   { code: 'bn', nativeName: 'বাংলা', name: 'Bengalisch' },
-  { code: 'pt', nativeName: 'Português', name: 'Portugiesisch' },
+  { code: 'pt', nativeName: 'Português (Brasil)', name: 'Portugiesisch' },
   { code: 'id', nativeName: 'Bahasa Indonesia', name: 'Indonesisch' },
   { code: 'ur', nativeName: 'اردو', name: 'Urdu' },
   { code: 'ru', nativeName: 'Русский', name: 'Russisch' },
@@ -104,11 +104,11 @@ const LINES: Record<AppLanguage, readonly string[]> = {
     'ভল্ট খুলুন','সুরক্ষিত ভল্ট তৈরি করুন','সংরক্ষণ','বাতিল','পাসওয়ার্ড','ইমেইল','ব্যবহারকারীর নাম','বন্ধ করুন','নাম'
   ],
   pt: [
-    'Cofre','Favoritos','Categorias','Visão geral','Definições',
-    'Idioma','Automático (idioma do dispositivo)','O idioma é guardado neste dispositivo. Os dados do cofre não são alterados.',
-    'Interface','Escolha a interface mais adequada.','Simples','Especialista','Aparência','Tamanho do texto',
-    'Sistema','Claro','Escuro','O meu cofre','Pesquisar','Encriptado','Bloquear cofre','Nova entrada','Nenhum resultado',
-    'Desbloquear cofre','Criar cofre seguro','Guardar','Cancelar','Palavra-passe','E-mail','Nome de utilizador','Fechar','Nome'
+    'Cofre','Favoritos','Categorias','Visão geral','Configurações',
+    'Idioma','Automático (idioma do dispositivo)','O idioma é salvo neste dispositivo. Os dados do cofre não mudam.',
+    'Interface','Escolha a interface ideal para você.','Simples','Avançado','Aparência','Tamanho do texto',
+    'Sistema','Claro','Escuro','Meu cofre','Pesquisar','Criptografado','Bloquear cofre','Novo registro','Nenhum resultado',
+    'Desbloquear cofre','Criar cofre seguro','Salvar','Cancelar','Senha','E-mail','Nome de usuário','Fechar','Nome'
   ],
   id: [
     'Brankas','Favorit','Kategori','Ringkasan','Pengaturan',
