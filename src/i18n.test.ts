@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFERENCES, normalizePreferences } from './preferences';
+import { lockCoverage, lockText } from './lockI18n';
 import { SUPPORTED_LANGUAGES, applyLanguage, currentLanguage,
   detectDeviceLanguage, isRTL, resolveLanguage, tr, translationCoverage } from './i18n';
 
@@ -28,10 +29,13 @@ describe('world language strategy and settings', () => {
   it('covers all core keys with a nonempty translation in every supported language', () => {
     for (const language of SUPPORTED_LANGUAGES) {
       expect(translationCoverage(language.code)).toBe(1);
+      expect(lockCoverage(language.code)).toBe(1);
       expect(tr('common.password', language.code)).toBeTruthy();
     }
     expect(tr('nav.settings', 'fr')).toBe('Paramètres');
     expect(tr('nav.settings', 'tr')).toBe('Ayarlar');
+    expect(lockText('newFootnote', 'en')).toContain('cannot be recovered');
+    expect(lockText('newFootnote', 'tr')).toContain('kurtarılamaz');
   });
   it('handles RTL and in-memory language changes without altering vault settings', () => {
     expect(isRTL('ar')).toBe(true);
