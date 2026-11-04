@@ -6,6 +6,17 @@ Product ID: `parola_ultra_lifetime` (must match Android + Firebase).
 Product type: **one-time non-consumable in-app product**. Do not create a paid second app, subscription or consumable product.
 Google Play Billing Library: **9.1.0** (Android native Capacitor plugin).
 
+## Fortschritt vom 4. November 2026 – interner Build 0.7.1
+
+- **Google Play:** Die signierte **Parola 0.7.1 / VersionCode 18** wurde via zentralem Dienstaccount `shadowless-play-automation@shadowless-bridge.iam.gserviceaccount.com` erfolgreich in den internen Test-Track hochgeladen. Produktions-Track unverändert.
+- **App Check:** Firebase App Check / Play Integrity API aktiviert und native Capacitor-Bridge `@capacitor-firebase/app-check@8.6.0` in den Android-Code eingebaut. Das interne AAB wurde mit `VITE_APPCHECK_ENABLED=true` gebaut. Firebase Functions `enforceAppCheck:false` bleibt bis zum bestätigten Test auf einem Play-installierten Gerät bestehen.
+- **Zertifikate:** Beide SHA-256-Fingerabdrücke sind in Firebase Android-App `1:693424731365:android:38ebf69e9e60d5b0fad00c` registriert: lokaler Upload-Schlüssel `A8:A4:69:04:0A:76:7D:A4:F3:0A:F2:AF:7C:FB:01:36:BE:8E:AF:28:33:13:3D:8B:04:47:10:0C:1F:CD:3E:43`, Google-Play-App-Signing-Schlüssel `67:7E:7A:E6:49:8F:5F:38:51:36:36:C8:18:9A:10:4D:F7:B2:66:C9:57:B5:21:6E:38:E7:21:C1:71:F9:8D:D6`; letzterer direkt über `generatedApks.list` (v18) verifiziert.
+- **Ultra:** `parola_ultra_lifetime` noch nicht in Play angelegt. Neue One-Time-Products benötigen bereits beim Anlegen eine Region mit Preis (API HTTP 400 bei Entwurf ohne Region). Ein verbindlicher Einmalkaufpreis ist noch nicht entschieden. Kein Kauf ist aktiv. `VITE_PLAY_BILLING_ENABLED` bleibt deaktiviert.
+- **Berechtigungen:** Zentraler Play-Dienstaccount darf Store-Listings und interne Tracks bearbeiten. Er hat **keine** Play-Console-Nutzerverwaltungsberechtigung (`developers/.../users` HTTP 403). Der Firebase-Functions-Laufzeitidentität `693424731365-compute@developer.gserviceaccount.com` sind die erforderlichen Play-Kauf-/Bestellrechte deshalb noch nicht nachgewiesen. In Google Play Console für Parola gezielt `View financial data` und `Manage orders and subscriptions` zuweisen. Keinen Schlüssel in das App-Bundle legen.
+- **Lokalisierung:** 20 Store-Listings vollständig; **nicht** 20 vollständig übersetzte In-App-Oberflächen. Letztere bleiben vor öffentlichem Release zu bearbeiten und prüfen.
+- **Firebase Geschenkcode-Admin:** Für die angegebenen Google-E-Mail-Varianten ist bisher kein bestehender Firebase-Auth-Account im Projekt auffindbar. Admin-Claim erst nach tatsächlicher Kontoerstellung und gesicherter Identitätsprüfung vergeben, dabei bestehende Claims erhalten.
+- **Offen vor Produktion:** App-Check-Token auf echtem Play-intern installierten Gerät, Kaufpreis/Produkt und Testkauf inklusive Rückerstattung, Konto-/Datenlöschung und Tresor-Backup-E2E, Play-Console-Richtlinien-/Datensicherheitsangaben, vollständige UI-Übersetzung sowie echter Live-Sicherheitsreview. Keine automatische öffentliche Freigabe.
+
 ## Code and safety guarantees
 
 - Google Play determines localized product price; never hardcode prices or purchase success in the app.
