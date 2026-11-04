@@ -2,7 +2,7 @@
  * Parola Google Play Store uploader.
  * Uses an ephemeral IAM Credentials token. Never creates or stores a key file.
  * Modes: --check (offline validation), --probe (auth, no publication), --upload.
- * Requires Play Console Manage store presence permission for the dedicated SA.
+ * Uses existing central Shadowless Play Automation service account.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,8 +14,7 @@ if (!['--check', '--probe', '--upload'].includes(mode)) {
   process.exit(2);
 }
 const app = 'com.shadowlessstudios.passwordmanager';
-const project = 'password-manager-parola';
-const serviceAccount = `parola-play-listings@${project}.iam.gserviceaccount.com`;
+const serviceAccount = process.env.PAROLA_PLAY_SERVICE_ACCOUNT || 'shadowless-play-automation@shadowless-bridge.iam.gserviceaccount.com';
 const mediaDir = process.env.PAROLA_PLAY_MEDIA_DIR || 'H:\\Meine Ablage\\Sharing\\Parola-PlayStore-EN';
 const textsFile = path.join(mediaDir, 'store-texts', 'localizations.json');
 const icon = path.join(mediaDir, 'Parola-Google-Play-Icon-512.png');
@@ -43,7 +42,9 @@ function inspectPng(filename, expectedWidth, expectedHeight) {
 }
 function validateStoreTexts() {
   if (!fs.existsSync(textsFile)) throw new Error(`Missing translations: ${textsFile}`);
-  const data = JSON.parse(fs.readFileSync(textsFile, 'utf8').replace(/^\uFEFF/, ''));
+  const original = JSON.parse(fs.readFileSync(textsFile, 'utf8').replace(/^\uFEFF/, ''));
+  const aliases = { 'id-ID': 'id', 'ur-PK': 'ur', 'vi-VN': 'vi', 'sw-KE': 'sw', 'th-TH': 'th' };
+  const data = Object.fromEntries(Object.entries(original).map(([code, row]) => [aliases[code] || code, row]));
   if (Object.keys(data).length !== 20 || !data['en-US']) throw new Error('Expected 20 locales including en-US');
   for (const [locale, listing] of Object.entries(data)) {
     if (!/^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$/.test(locale)) throw new Error(`Locale invalid: ${locale}`);

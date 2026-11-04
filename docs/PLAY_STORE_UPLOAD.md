@@ -1,31 +1,36 @@
-# Parola: Google Play Store listing uploader
+# Parola: Google Play Store Upload
 
-Status 2026-11-04: OAuth scope configured. Dedicated service account created. Google Play Console app permission still missing (HTTP 403). No Play Store content uploaded.
+Status 2026-11-04: ALL 20 localized listings and en-US icon/screenshots successfully committed via the Google Play Developer API.
+Committed upload report: H:\Meine Ablage\Sharing\Parola-PlayStore-EN\play-upload-report.json
 
-## One-time Play Console action
-Sign in to https://play.google.com/console/ as the Play developer account.
-Go to Users and permissions and invite this service account:
-parola-play-listings@password-manager-parola.iam.gserviceaccount.com
+## Central Shadowless Studios Play automation account
 
-Grant access ONLY to Parola (com.shadowlessstudios.passwordmanager) with:
-- View app information and download bulk reports (read-only)
-- Manage store presence
+shadowless-play-automation@shadowless-bridge.iam.gserviceaccount.com
+Google Cloud project: shadowless-bridge
+User login: tamergt@googlemail.com (IAM canonical user: tamergt@gmail.com).
+Authentication uses the pre-existing short-lived service-account impersonation flow; no downloaded service-account key is required.
+Verified: this account has Google Play API access to com.shadowlessstudios.passwordmanager.
+Note: account-wide access to every other Play Console app has not been fully audited.
 
-Do NOT grant broad release or finance permissions. No service account private key is stored locally.
+## Prepared materials
 
-## Prepared assets
-Directory: H:\Meine Ablage\Sharing\Parola-PlayStore-EN
-- store-texts/localizations.json: 20 translated titles, short and full descriptions.
-- Parola-Google-Play-Icon-512.png: 512x512 (en-US only).
-- Seven files *_EN.png: 1080x1920 English phone screenshots (en-US only).
-- PREVIEW.html: preview gallery.
-- UPLOAD_TO_PLAY.cmd: performs --check, then --upload.
+- store-texts/localizations.json: 20 Play locale texts.
+- Parola-Google-Play-Icon-512.png: 512x512 (en-US).
+- Seven *_EN.png: 1080x1920 English phone screenshots (en-US only).
+- PREVIEW.html: visual preview. Demo data is fictitious.
 
-## Commands (run from PassManager repository)
+## Command in PassManager root
+
+UPLOAD_TO_PLAY.cmd
+
+Or manually:
 node scripts/play-store-upload.mjs --check
 node scripts/play-store-upload.mjs --probe
 node scripts/play-store-upload.mjs --upload
 
-The uploader creates a Play edit, updates all supported localizations, replaces the en-US icon and phone screenshots only, verifies the edit and commits it. It does not upload AAB files or release an app to production. After success it records play-upload-report.json in the media folder.
+The script normalizes these app-language locale codes to Google Play codes:
+id-ID -> id, ur-PK -> ur, vi-VN -> vi, sw-KE -> sw, th-TH -> th.
 
-Actual status: Local check passed 20 locales, 7 screenshots and 1 icon. API probe 403 until the service account is invited to Parola in Google Play Console.
+Only English store graphics are replaced. Other language listings contain text only and fall back to English graphics.
+The uploader updates store listings, not AABs, pricing, licenses or public release tracks.
+Google Play edits have already been committed for this release. No further manual upload needed unless the content changes.
