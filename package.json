@@ -1,7 +1,7 @@
 {
     "name": "passmanager",
     "private": true,
-    "version": "0.7.0",
+    "version": "0.7.1",
     "type": "module",
     "scripts": {
         "dev": "vite --host 0.0.0.0",
@@ -17,6 +17,7 @@
     "dependencies": {
         "@aparajita/capacitor-biometric-auth": "^10.0.0",
         "@aparajita/capacitor-secure-storage": "^8.0.1",
+        "@capacitor-firebase/app-check": "^8.6.0",
         "@capacitor-mlkit/text-recognition": "^8.2.1",
         "@capacitor/android": "8.5.2",
         "@capacitor/app": "^8.0.0",
