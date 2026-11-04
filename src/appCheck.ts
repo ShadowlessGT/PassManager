@@ -14,7 +14,15 @@ export async function initializeNativeAppCheck(): Promise<void> {
   const { cloudConfigured } = await import('./cloud');
   if (!cloudConfigured) return;
   initializeAppCheck(getApp(), {
-    provider: new CustomProvider({ getToken: () => FirebaseAppCheck.getToken({ forceRefresh: false }) }),
+    provider: new CustomProvider({
+      getToken: async () => {
+        const result = await FirebaseAppCheck.getToken({ forceRefresh: false });
+        if (!result.token || !result.expireTimeMillis) {
+          throw new Error('Native App Check token or expiry missing');
+        }
+        return { token: result.token, expireTimeMillis: result.expireTimeMillis };
+      },
+    }),
     isTokenAutoRefreshEnabled: true,
   });
 }
