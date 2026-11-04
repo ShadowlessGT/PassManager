@@ -1,6 +1,5 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
 import { preparePrivacyScreen } from './device';
 import './styles.css';
 import { loadPreferences } from './preferences';
@@ -18,6 +17,21 @@ void preparePrivacyScreen().catch(() => {
   if (import.meta.env.PROD) document.documentElement.classList.add('privacy-guard-failed');
 });
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><App /></React.StrictMode>
-);
+async function startApp() {
+  try {
+    // Initialization is gated for Android and must run before components use
+    // Firebase calls. Do not block offline vault use if Play Integrity fails.
+    const { initializeNativeAppCheck } = await import('./appCheck');
+    await initializeNativeAppCheck();
+  } catch {
+    // App Check failures are not proof that the user's local vault is unsafe.
+    // Server enforcement stays disabled until a real Play-installed E2E test.
+    document.documentElement.dataset.appCheckStatus = 'unavailable';
+  }
+  const { default: App } = await import('./App');
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode><App /></React.StrictMode>
+  );
+}
+
+void startApp();
