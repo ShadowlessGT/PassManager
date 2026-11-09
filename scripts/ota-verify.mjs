@@ -7,7 +7,9 @@ import { basename, join, resolve } from 'node:path';
  * Usage: node scripts/ota-verify.mjs
  * Prints checks, but never reads or needs the private signing key.
  */
-const dir = resolve('ota-public', 'ota', 'android');
+const dir = process.argv.includes('--public')
+  ? resolve('ota-public', 'ota', 'android')
+  : resolve('ota-staging', 'ota', 'android');
 const file = join(dir, 'stable.json');
 if (!existsSync(file)) throw Error('Signed stable.json missing');
 const m = JSON.parse(readFileSync(file, 'utf8'));

@@ -458,3 +458,4 @@ android/gradle-local.err
 # Signed OTA releases are generated locally, not committed to GitHub
 /ota-public/ota/android/stable.json
 /ota-public/ota/android/bundles/
+/ota-staging/

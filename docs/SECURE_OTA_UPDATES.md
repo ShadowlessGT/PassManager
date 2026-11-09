@@ -47,9 +47,9 @@ Neue `0.7.2` (versionCode 19) **zuerst im internen Google-Play-Test** verteilen.
 npm run ota:bundle -- --version 0.7.3 --notes "Verbesserungen an der Oberfläche" --min-native-code 19 --max-native-code 19
 ```
 
-3. Prüfen: `ota-public/ota/android/stable.json` und `ota-public/ota/android/bundles/*.zip` enthalten **keine Geheimnisse**. Die Dateien sind bewusst von Git ausgeschlossen.
+3. Prüfen: `ota-staging/ota/android/stable.json` und `ota-staging/ota/android/bundles/*.zip` enthalten **keine Geheimnisse**. Die Dateien liegen im getrennten Verzeichnis `ota-staging/ota/android/` und sind bewusst von Git und vom Firebase-Hosting-Deployment ausgeschlossen.
 4. Die Firebase-Hosting-Konfiguration zunächst mit `firebase hosting:sites:list --project password-manager-parola` und `firebase hosting:channel:deploy ...` auf einer sicheren Preview testen; keine bestehenden Websites überschreiben. Das definierte Hosting-Ziel ist `password-manager-parola.web.app`.
-5. Nur nach Android-E2E-Freigabe das freigegebene Paket und **danach** das neue signierte `stable.json` per `firebase deploy --only hosting --project password-manager-parola` bereitstellen. Bei diesem Deploy sollte vorher geprüft werden, ob das Verzeichnis alle benötigten früheren Releases enthält, da Hosting einen Snapshot veröffentlicht. Frühere noch kompatible Bundles nicht versehentlich aus der Verteilung entfernen.
+5. Nach Android-E2E-Freigabe explizit `npm run ota:stage -- --version 0.7.3 --approve-tested-android-update` ausführen. Das prüft Signatur und Prüfsumme erneut und kopiert nur den freigegebenen Kandidaten ins Hosting-Verzeichnis, veröffentlicht ihn aber noch nicht. Der Firebase-Hosting-Predeploy-Guard verhindert eine versehentliche Veröffentlichung ohne zusätzliche Versionsfreigabe. PowerShell-Beispiel: `$env:PAROLA_OTA_DEPLOY_APPROVED="0.7.3"; firebase deploy --only hosting --project password-manager-parola; Remove-Item Env:PAROLA_OTA_DEPLOY_APPROVED`. Bei diesem Deploy sollte vorher geprüft werden, ob das Verzeichnis alle benötigten früheren Releases enthält, da Hosting einen Snapshot veröffentlicht. Frühere noch kompatible Bundles nicht versehentlich aus der Verteilung entfernen.
 
 ## Sperre / Rollback
 
@@ -60,4 +60,4 @@ npm run ota:bundle -- --version 0.7.3 --notes "Verbesserungen an der Oberfläche
 
 ## Aktueller Status
 
-Die Clientseite, Android-Synchronisierung, Signaturprüfung und Unit-Tests sind implementiert. **Noch ausstehend:** vollständiger Android-Build/Tests auf einem echten Gerät, Hosting-Preview inkl. echter signierter ZIPs, fachliche Rollback-Tests, Paket-Sicherheitsprüfung, interne Play-Testversion 0.7.2 (versionCode 19) und aktive Firebase-Hosting-Distribution. **Kein Produktions-Rollout erfolgt.**
+Client, Android-Debug-Build, Signaturprüfung und Unit-Tests sind implementiert. Der Firebase-Hosting-Endpunkt ist eingerichtet, enthält aber bewusst kein aktives OTA-Manifest. Ein signiertes Paket 0.7.3 wurde nur als lokaler, nicht freigegebener Test erzeugt. **Noch ausstehend:** vollständiger Android-Build/Tests auf einem echten Gerät, Hosting-Preview inkl. echter signierter ZIPs, fachliche Rollback-Tests, Paket-Sicherheitsprüfung, interne Play-Testversion 0.7.2 (versionCode 19) und aktive Firebase-Hosting-Distribution. **Kein Produktions-Rollout erfolgt.**

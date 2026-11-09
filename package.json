@@ -13,7 +13,9 @@
         "test": "vitest run",
         "test:rules": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-firestore-rules.ps1",
         "build:site": "vite build --config vite.site.config.ts",
-        "ota:bundle": "npm run build && node scripts/ota-release.mjs"
+        "ota:bundle": "npm run build && node scripts/ota-release.mjs",
+        "ota:verify": "node scripts/ota-verify.mjs",
+        "ota:stage": "node scripts/ota-stage-hosting.mjs"
     },
     "dependencies": {
         "@aparajita/capacitor-biometric-auth": "^10.0.0",

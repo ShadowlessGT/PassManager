@@ -78,7 +78,7 @@ function filesUnder(dir) {
     });
 }
 
-const outDir = join(root, 'ota-public', 'ota', 'android');
+const outDir = join(root, 'ota-staging', 'ota', 'android');
 mkdirSync(join(outDir, 'bundles'), { recursive: true });
 const tmpZip = join(outDir, 'bundles', '.parola-ota-' + process.pid + '.zip');
 const zip = new yazl.ZipFile();
