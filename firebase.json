@@ -1,4 +1,18 @@
 {
   "firestore": { "rules": "firestore.rules" },
-  "functions": { "source": "functions", "runtime": "nodejs22" }
+  "functions": { "source": "functions", "runtime": "nodejs22" },
+  "hosting": {
+    "public": "ota-public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "/ota/android/stable.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-store, max-age=0" }]
+      },
+      {
+        "source": "/ota/android/bundles/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      }
+    ]
+  }
 }
