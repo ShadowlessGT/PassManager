@@ -11,17 +11,35 @@ import ftplib
 import hashlib
 import importlib.util
 import json
+import ssl
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-STAGED = ROOT / "ota-public" / "ota" / "android"
+STAGED = ROOT / "ota-staging" / "ota" / "android"
+HEADERS = ROOT / "ota-public" / "ota" / "android" / ".htaccess"
 ORIGIN = "https://parola.shadowless-studios.eu"
 MAX_ZIP = 80 * 1024 * 1024
 
 spec = importlib.util.spec_from_file_location("parola_site_deploy", ROOT / "scripts" / "deploy-site.py")
 site = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(site)
+
+
+class VerifiedHostingerAliasFTPS(ftplib.FTP_TLS):
+    """TLS chain verified; permits ONLY Hostinger's known *.hstgr.io cert behind FTP DNS alias.
+
+    Hostinger's ftp.shadowless-studios.eu currently presents that cert; see MonStar deployer.
+    This check runs before any username/password is transmitted.
+    """
+    def auth(self):
+        result = super().auth()
+        peer = self.sock.getpeercert()
+        cn = [value for group in peer.get("subject", ()) for key, value in group if key == "commonName"]
+        if cn != ["*.hstgr.io"]:
+            self.close()
+            raise ssl.SSLCertVerificationError("Unexpected Hostinger FTP TLS certificate name")
+        return result
 
 
 def load_local_release() -> tuple[dict, Path]:
@@ -45,7 +63,7 @@ def load_local_release() -> tuple[dict, Path]:
     digest = hashlib.sha256(zip_file.read_bytes()).hexdigest()
     if digest != release.get("sha256") or zip_file.stat().st_size != release.get("sizeBytes"):
         raise RuntimeError("OTA-ZIP stimmt nicht mit dem signierten Manifest ueberein")
-    if not (STAGED / ".htaccess").is_file():
+    if not HEADERS.is_file():
         raise RuntimeError("Sichere HTTP/CORS-Header-Konfiguration fehlt")
     return manifest, zip_file
 
@@ -88,11 +106,15 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Parola signed OTA upload to Hostinger")
     p.add_argument("--probe", action="store_true", help="Read-only server and OTA status")
     p.add_argument("--publish", action="store_true", help="Upload only signed OTA files")
+    p.add_argument("--prepare", action="store_true", help="Upload only immutable ZIP and server headers, NOT stable.json")
     p.add_argument("--version", help="Approved X.Y.Z release for --publish")
     p.add_argument("--approve-tested-android-update", action="store_true")
     args = p.parse_args()
-    if args.publish == args.probe:
-        raise RuntimeError("Entweder --probe oder --publish erforderlich")
+    if sum((args.publish, args.probe, args.prepare)) != 1:
+        raise RuntimeError("Genau eines: --probe, --prepare oder --publish")
+    global STAGED
+    if args.publish:
+        STAGED = ROOT / "ota-public" / "ota" / "android"
     manifest, zip_file = load_local_release()
     release = manifest["release"]
     if args.publish and (args.version != release["version"] or not args.approve_tested_android_update):
@@ -103,7 +125,7 @@ def main() -> int:
     # Independently checks the pinned key's signature, trusted origin, ZIP SHA256 and ZIP signature.
     import subprocess
     subprocess.run(
-        ["node", str(ROOT / "scripts" / "ota-verify.mjs"), "--public"],
+        ["node", str(ROOT / "scripts" / "ota-verify.mjs")] + (["--public"] if args.publish else []),
         cwd=ROOT, check=True,
     )
     config = site.load_env(site.ENV)
@@ -121,7 +143,13 @@ def main() -> int:
     host = config["HOSTINGER_FTP_HOST"].strip()
     port = int(config.get("HOSTINGER_FTP_PORT") or ("65002" if protocol == "sftp" else "21"))
     target = site.check_target(config["HOSTINGER_FTP_TARGET"])
-    ftp = site.ftp_client(host, port, protocol, config)
+    if protocol == "ftps" and host == "ftp.shadowless-studios.eu" and port == 21:
+        # Only the known Hostinger alias is allowed. No insecure FTP / no untrusted chain.
+        context = ssl.create_default_context()
+        context.check_hostname = False  # DNS alias != Hostinger's valid *.hstgr.io certificate
+        ftp = VerifiedHostingerAliasFTPS(context=context, timeout=30)
+    else:
+        ftp = site.ftp_client(host, port, protocol, config)
     try:
         site.ftp_connect(ftp, host, port, config["HOSTINGER_FTP_USER"], config["HOSTINGER_FTP_PASSWORD"], protocol)
         base = site.goto_target(ftp, target)
@@ -150,10 +178,10 @@ def main() -> int:
         android_dir = visit_or_create(ftp, base, ["ota", "android"], True)
         ftp.cwd(android_dir)
         # Write .htaccess first: CORS and no-cache must already be active before manifest.
-        with (STAGED / ".htaccess").open("rb") as handle:
+        with HEADERS.open("rb") as handle:
             ftp.storbinary("STOR .htaccess", handle)
         got_headers = maybe_read(ftp, ".htaccess", 10_000)
-        if got_headers != (STAGED / ".htaccess").read_bytes():
+        if got_headers != HEADERS.read_bytes():
             raise RuntimeError("Hostinger HTTP-Header-Datei wurde nicht korrekt uebertragen")
         bundles = visit_or_create(ftp, android_dir, ["bundles"], True)
         ftp.cwd(bundles)
@@ -170,6 +198,10 @@ def main() -> int:
                 raise RuntimeError("Hostinger ZIP-Upload stimmt nicht mit der Signatur ueberein")
             print("ZIP hochgeladen und per SHA-256 geprueft:", zip_file.name)
         ftp.cwd(android_dir)
+        if args.prepare:
+            print("Hostinger OTA vorbereitet: Header und unveraenderliches ZIP vorhanden.")
+            print("ABER: stable.json NICHT hochgeladen; KEIN Android-Update aktiviert.")
+            return 0
         # LAST operation: a manifest is a live release; never upload before verifying ZIP.
         contents = (STAGED / "stable.json").read_bytes()
         import io

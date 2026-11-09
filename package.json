@@ -17,7 +17,8 @@
         "ota:verify": "node scripts/ota-verify.mjs",
         "ota:stage": "node scripts/ota-stage-hostinger.mjs",
         "ota:probe": "python scripts/ota-hostinger-upload.py --probe",
-        "ota:publish": "python scripts/ota-hostinger-upload.py --publish"
+        "ota:publish": "python scripts/ota-hostinger-upload.py --publish",
+        "ota:prepare": "python scripts/ota-hostinger-upload.py --prepare"
     },
     "dependencies": {
         "@aparajita/capacitor-biometric-auth": "^10.0.0",
