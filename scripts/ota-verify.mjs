@@ -28,7 +28,7 @@ const canonical = JSON.stringify([
 const valid = verify('sha256', Buffer.from(canonical),
   { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(m.signature, 'base64url'));
 if (!valid) throw Error('OTA manifest signature invalid');
-if (typeof r.zipUrl !== 'string' || !r.zipUrl.startsWith('https://password-manager-parola.web.app/ota/android/bundles/')) {
+if (typeof r.zipUrl !== 'string' || !r.zipUrl.startsWith('https://parola.shadowless-studios.eu/ota/android/bundles/')) {
   throw Error('Untrusted bundle URL');
 }
 const path = join(dir, 'bundles', basename(new URL(r.zipUrl).pathname));

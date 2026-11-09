@@ -4,7 +4,7 @@ import { PAROLA_OTA_PUBLIC_KEY } from './otaPublicKey';
  * A signed manifest is the only authority for remotely executable web assets.
  * Pinned HTTPS origin + P-256 signature + SHA-256 zip checksum are mandatory.
  */
-export const OTA_ORIGIN = 'https://password-manager-parola.web.app';
+export const OTA_ORIGIN = 'https://parola.shadowless-studios.eu';
 export const OTA_MANIFEST_URL = OTA_ORIGIN + '/ota/android/stable.json';
 export const OTA_MAX_MANIFEST_BYTES = 8192;
 export const OTA_MAX_BUNDLE_BYTES = 80 * 1024 * 1024;

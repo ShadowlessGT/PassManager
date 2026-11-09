@@ -15,7 +15,9 @@
         "build:site": "vite build --config vite.site.config.ts",
         "ota:bundle": "npm run build && node scripts/ota-release.mjs",
         "ota:verify": "node scripts/ota-verify.mjs",
-        "ota:stage": "node scripts/ota-stage-hosting.mjs"
+        "ota:stage": "node scripts/ota-stage-hostinger.mjs",
+        "ota:probe": "python scripts/ota-hostinger-upload.py --probe",
+        "ota:publish": "python scripts/ota-hostinger-upload.py --publish"
     },
     "dependencies": {
         "@aparajita/capacitor-biometric-auth": "^10.0.0",

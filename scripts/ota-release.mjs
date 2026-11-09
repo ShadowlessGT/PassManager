@@ -1,9 +1,10 @@
 /**
- * Locally package and sign a Parola HTML/CSS/JS release for Firebase Hosting.
+ * Locally package and sign a Parola HTML/CSS/JS release for Hostinger.
  * Does NOT deploy, modify Play Console, or update a user's phone.
  *
  * npm run ota:bundle -- --version 0.7.3 --notes "Kleine Verbesserungen"
- * firebase deploy --only hosting --project password-manager-parola  (after QA)
+ * python scripts/ota-hostinger-upload.py --probe  (read-only)
+ * python scripts/ota-hostinger-upload.py --publish --version X.Y.Z --approve-tested-android-update  (after Android QA)
  *
  * Keep private key OFF GitHub / hosting / Android APK / build output.
  */
@@ -17,7 +18,7 @@ import yazl from 'yazl';
 const root = resolve('.');
 const nativeMinDefault = 19;
 const nativeMaxDefault = 19;
-const origin = 'https://password-manager-parola.web.app';
+const origin = 'https://parola.shadowless-studios.eu';
 const argumentsList = process.argv.slice(2);
 function arg(name, fallback) {
   const index = argumentsList.indexOf(name);

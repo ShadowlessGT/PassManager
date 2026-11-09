@@ -1,63 +1,42 @@
-# Parola: sichere Web-Updates ohne neuen Play-Store-Upload
+# Parola: sichere signierte Web-Updates via bestehende Hostinger-Webseite
 
-Stand: 09.11.2026 — **Implementiert auf Entwicklungsbranch, NICHT produktiv freigegeben.**
+Stand: 09.11.2026. Implementiert auf `feat/parola-secure-ota-updates`, **nicht produktiv freigegeben**.
 
 ## Architektur
 
-- Die vollständige, offline nutzbare React-/Capacitor-App bleibt Bestandteil der Android-AAB.
-- Version 0.7.2 / Android versionCode **19** führt erstmals die native Updater-Funktion ein.
-- Etwa 7 Sekunden **nach** dem ersten UI-Rendering fragt die App im Hintergrund eine feste Firebase-Hosting-Adresse ab. Bei Wiederaufnahme wird frühestens nach 30 Minuten erneut geprüft. Offline oder bei Netzwerkfehlern wird kein Zugriff auf den Tresor blockiert.
-- Die Datei `https://password-manager-parola.web.app/ota/android/stable.json` enthält eine Release-Version, Kompatibilitätsbereich der Android-VersionCodes, Notizen, ZIP-URL, genaue Downloadgröße, SHA-256 und **ECDSA-P-256-Signatur**.
-- Die App akzeptiert nur mit einem im ursprünglichen AAB hinterlegten öffentlichen Schlüssel verifizierte Metadaten und ZIP-URLs auf der festgelegten Domain. Der native Updater überprüft zusätzlich die SHA-256-Prüfsumme des heruntergeladenen ZIPs vor Entpacken/Aktivieren.
-- Nutzer sehen eine nicht blockierende Update-Einladung mit Downloadgröße und können **„Jetzt aktualisieren“** oder **„Später“** wählen. Keine automatische Installation, keine laufende Änderung an Code zur Laufzeit ohne Zustimmung.
-- Beim Wechsel der Web-Dateien startet die WebView neu, und der **im Arbeitsspeicher gehaltene Tresor-Schlüssel geht verloren**; erneutes Entsperren ist erforderlich.
-- `notifyAppReady` meldet dem nativen Updater nach UI-Rendering einen funktionierenden Start. Die Capgo-AppReady-Überwachung kann bei einem nicht startfähigen Web-Bundle auf das vorherige funktionierende Bundle zurückschalten. Trotzdem sind **echte Testgeräte, funktionierende Rücksicherung und verschlüsselte Backups erforderlich**.
-- **Native Änderungen** (Android SDK, Berechtigungen, Capacitor-Plugins, native Sicherheit, Google Play Billing) benötigen weiterhin eine neue Google-Play-AAB. OTA ersetzt keine regulären Store-Updates.
+- Bestehende Parola-Website: https://parola.shadowless-studios.eu/ (Hostinger). **Keine separate Firebase Hosting-Verteilung erforderlich**.
+- Fest im Android-Client hinterlegter Update-Endpunkt: https://parola.shadowless-studios.eu/ota/android/stable.json
+- Unveränderliche ZIP-Dateien: https://parola.shadowless-studios.eu/ota/android/bundles/parola-web-VERSION-HASH.zip
+- Android 0.7.2/versionCode 19 enthält erstmalig den nativen Capgo-Updater. Das Android-AAB enthält alle Offline-Dateien.
+- Die App prüft etwa 7 Sekunden nach dem Start und bei Rückkehr aus dem Hintergrund frühestens nach 30 Minuten.
+- Jedes Manifest enthält Versionsbereich für Android, SHA-256, exakte Paketgröße, Änderungsnotizen und eine **ECDSA-P-256-Signatur**. Nur der im AAB verankerte öffentliche Schlüssel verifiziert die Signatur. Die App akzeptiert **nur ZIP-URLs vom festen Hostinger-Origin**. Der native Updater prüft außerdem SHA-256.
+- **Nutzer müssen auf „Jetzt aktualisieren“ tippen**. Offline-Zugriff auf den verschlüsselten Tresor bleibt erhalten. Beim WebView-Neustart wird der RAM-Tresorschlüssel verworfen; erneutes Entsperren ist notwendig.
+- Der native AppReady-Watchdog kann nicht startfähige Bundles zurückrollen. Fachliche Fehler und Datenmigrationen benötigen eigene Tests/Notfallplan.
+- **Native Änderungen** (Android-Code, Berechtigungen, Capacitor-Plugins, Billing) benötigen weiter ein neues Google-Play-AAB.
+- Firebase **Auth/Firestore/Backup** werden nicht geändert; nur die Verteilung der UI-Updates nutzt Hostinger.
 
-## Sicherheit / Release-Schranken
+## Sicherheit
 
-1. Der **private** ECDSA-P-256-OTA-Schlüssel liegt lokal außerhalb des Git-Repositories: `%USERPROFILE%\Documents\Parola-OTA-Signing\parola-ota-ecdsa-p256-private.pem`. Das Verzeichnis ist auf Windows-Benutzer und SYSTEM berechtigt. **Weder private Schlüssel, Entschlüsselungsschlüssel, Masterpasswörter noch Firebase-Admin-Schlüssel dürfen in ZIPs, Git, AAB oder Firebase Hosting gelangen.** Den OTA-Schlüssel verschlüsselt offline sichern. Verlust des Schlüssels erfordert neues AAB mit neuer Vertrauenskette.
-2. Der öffentliche Schlüssel ist in `src/otaPublicKey.ts` fest eingebaut; eine geänderte Signatur kann vom Server allein nicht vorgetäuscht werden. Wer Zugriff auf den privaten Schlüssel hat, könnte jedoch beliebigen App-JavaScript-Code freigeben. Er muss wie ein produktionskritischer Signaturschlüssel geschützt werden.
-3. Der Release-Generator `scripts/ota-release.mjs` akzeptiert nur eine **höhere** semantische Web-Version, passende native versionCodes und eine funktionsfähige Build-Konfiguration. Er veröffentlich selbst **nichts**. Der aktuelle Default-Kompatibilitätsbereich ist exakt `19..19`.
-4. Die API der Download-Bundles liegt auf Firebase Hosting, getrennt von den verschlüsselten Nutzerinhalten. Ein Web-Update darf bestehende IndexedDB- und Secure-Storage-Schemata nicht inkompatibel ändern. Alle Vault-/Backup-Migrationen separat und rückwärtskompatibel testen.
-5. `npm audit` meldet aktuell noch Paketwarnungen; vor öffentlichem Release beheben/prüfen. Ein externes Security-Review ist für einen Passwortmanager sinnvoll.
-6. Keine GitHub Actions; lokale Builds, Tests, Signierung und manuelle Freigabe.
+Der **private** Signaturschlüssel liegt ausschließlich lokal außerhalb von Git:
+`%USERPROFILE%\Documents\Parola-OTA-Signing\parola-ota-ecdsa-p256-private.pem`.
+**Niemals** Schlüssel, Passwörter, Firebase-Admin-Credentials, Masterpasswörter oder Tresorinhalte nach Hostinger/GitHub hochladen. Der öffentliche Schlüssel liegt in `src/otaPublicKey.ts`; gestohlener Privatschlüssel wäre kritisch. Den privaten Schlüssel verschlüsselt offline sichern.
 
-## Einmalige Android-Einführung
+`src/otaManifest.ts` pinnt die Hostinger-Domain. Ein Angreifer mit Webserver-Zugriff kann ein gültiges Update ohne den privaten Signaturschlüssel nicht fälschen. Der Server muss HTTPS, CORS und Cache-Verhalten korrekt ausliefern. Die dedizierte `ota/android/.htaccess` setzt CORS für `stable.json`, verhindert Manifest-Caching und cached unveränderliche ZIP-Dateien. **CORS im echten Android-WebView noch nachweisen**.
 
-Im Projektverzeichnis:
+## Rollout
 
-```powershell
-npm ci
-npm run build
-npm test
-npx cap sync android
-# Danach mit Android Studio/JDK21 Android bauen
-# Release-AAB mit vorhandenem Upload-Keystore signieren
-```
+1. Code/Test auf einem Gerät mit Dummy-Tresor prüfen. App-Version 0.7.2 / versionCode 19 zuerst intern über Google Play verteilen; noch **keine** Live-OTA-Datei veröffentlichen.
+2. Für ein Web-Release aus dem Repo: `npm test`, `npm run ota:bundle -- --version 0.7.3 --notes "UI Verbesserungen" --min-native-code 19 --max-native-code 19`. Aus `dist/` wird ein vollständiges signiertes Bundle in **`ota-staging/ota/android/`** erstellt. Dieses Skript veröffentlicht nichts.
+3. Mit `npm run ota:verify` verifizieren. Erst nach Android-QA: `npm run ota:stage -- --version 0.7.3 --approve-tested-android-update`. Das kopiert signierte Dateien nach `ota-public/ota/android/`, **ohne Upload**.
+4. Der bestehende Hostinger-Website-Upload `DEPLOY_SITE.cmd` lädt nur `site-dist/` hoch. OTA hat einen **separaten Upload**. Eine lokale `deploy.local.env` braucht ein **nachweislich korrektes Parola-Document-Root**, Benutzer/Passwort, SFTP mit geprüftem SSH-Fingerprint oder FTPS mit gültigem TLS-Zertifikat. Keine Zugangsdaten in Git oder Chat.
+5. **Read-only Probe**: `npm run ota:probe`. Vor Freigabe wird geprüft, ob im Remote-Ziel tatsächlich die Parola-Webseite liegt. Fehlt die lokale Konfiguration, meldet die Probe lediglich den ausstehenden Zugang; **kein** Upload.
+6. Nach echten Android-Tests und gesicherten Tresordaten ausdrücklich `npm run ota:publish -- --version 0.7.3 --approve-tested-android-update` ausführen. Das Skript prüft die P-256-Signatur und ZIP-SHA-256 erneut, akzeptiert ausschließlich verschlüsselte Verbindung, schreibt nur unter `ota/android/`, verifiziert Remote-Bytes und veröffentlicht `stable.json` **zuletzt**. Keine Website-Datei und kein früheres Bundle werden gelöscht. Ein Downgrade des Live-Kanals ist gesperrt.
+7. Öffentliche Verteilung mit HTTPS prüfen: `stable.json` mit `Cache-Control: no-store`, `Access-Control-Allow-Origin: *`, ZIP unter signierter Hostinger-URL und SHA-256 identisch. **Keine Freigabe**, solange diese HTTP-Prüfung und der Android-E2E-Test fehlen.
 
-Neue `0.7.2` (versionCode 19) **zuerst im internen Google-Play-Test** verteilen. Native OTA-Funktion auf echtem Gerät prüfen, einschließlich Original-Tresor-Sicherung, Offline-Start, Update-Dialog und Rückfall. Vorher **kein** OTA-Manifest veröffentlichen.
+## Updates stoppen / Rollback
 
-## Ein späteres Web-Update vorbereiten
+Manifest auf dem Hostinger-Server zurückziehen: Es werden keine neuen OTA-Installationen angeboten. Bereits installierte Bundles bleiben bestehen; im Notfall signierte **höhere** Web-Version oder neues Play-AAB. Der Capgo-AppReady-Watchdog ist kein Ersatz für Tests von Tresor-Migrationen und Backup/Restore.
 
-1. Web-Code verändern. Vor jeder Freigabe `npm test`, `npm run build`, Android-Dummy-Tresor mit Backup/Restore testen. Firebase-Konfiguration aus der sicheren `.env.local` verwenden.
-2. Eine **höhere** Web-Version signieren, beispielsweise `0.7.3` (native Code 19 bleibt):
+## Aktueller Stand
 
-```powershell
-npm run ota:bundle -- --version 0.7.3 --notes "Verbesserungen an der Oberfläche" --min-native-code 19 --max-native-code 19
-```
-
-3. Prüfen: `ota-staging/ota/android/stable.json` und `ota-staging/ota/android/bundles/*.zip` enthalten **keine Geheimnisse**. Die Dateien liegen im getrennten Verzeichnis `ota-staging/ota/android/` und sind bewusst von Git und vom Firebase-Hosting-Deployment ausgeschlossen.
-4. Die Firebase-Hosting-Konfiguration zunächst mit `firebase hosting:sites:list --project password-manager-parola` und `firebase hosting:channel:deploy ...` auf einer sicheren Preview testen; keine bestehenden Websites überschreiben. Das definierte Hosting-Ziel ist `password-manager-parola.web.app`.
-5. Nach Android-E2E-Freigabe explizit `npm run ota:stage -- --version 0.7.3 --approve-tested-android-update` ausführen. Das prüft Signatur und Prüfsumme erneut und kopiert nur den freigegebenen Kandidaten ins Hosting-Verzeichnis, veröffentlicht ihn aber noch nicht. Der Firebase-Hosting-Predeploy-Guard verhindert eine versehentliche Veröffentlichung ohne zusätzliche Versionsfreigabe. PowerShell-Beispiel: `$env:PAROLA_OTA_DEPLOY_APPROVED="0.7.3"; firebase deploy --only hosting --project password-manager-parola; Remove-Item Env:PAROLA_OTA_DEPLOY_APPROVED`. Bei diesem Deploy sollte vorher geprüft werden, ob das Verzeichnis alle benötigten früheren Releases enthält, da Hosting einen Snapshot veröffentlicht. Frühere noch kompatible Bundles nicht versehentlich aus der Verteilung entfernen.
-
-## Sperre / Rollback
-
-- Neues Update wird nur auf ausdrücklichen Nutzerklick installiert.
-- Ungültige Metadaten/Signaturen/Hashes, Netzwerkfehler, inkompatible native Versionen und Offline-Zustand verhindern das OTA ohne Datenverlust.
-- Der native Watchdog versucht bei fehlendem `notifyAppReady` den Rückfall.
-- Falls ein Update zwar startet, aber fachlich fehlerhaft ist: Notfallkorrektur nur mit **höherer** signierter Web-Version; im Zweifel neues signiertes AAB über Google Play. Das veröffentlichte `stable.json` kann vom Hosting entfernt werden, wodurch keine neuen Installationen des defekten OTA starten. Ein bereits installiertes Bundle wird dadurch nicht automatisch entfernt.
-
-## Aktueller Status
-
-Client, Android-Debug-Build, Signaturprüfung und Unit-Tests sind implementiert. Der Firebase-Hosting-Endpunkt ist eingerichtet, enthält aber bewusst kein aktives OTA-Manifest. Ein signiertes Paket 0.7.3 wurde nur als lokaler, nicht freigegebener Test erzeugt. **Noch ausstehend:** vollständiger Android-Build/Tests auf einem echten Gerät, Hosting-Preview inkl. echter signierter ZIPs, fachliche Rollback-Tests, Paket-Sicherheitsprüfung, interne Play-Testversion 0.7.2 (versionCode 19) und aktive Firebase-Hosting-Distribution. **Kein Produktions-Rollout erfolgt.**
+Hostinger-Landingpage ist online (HTTP 200), `/ota/android/stable.json` ist derzeit **404**. Code für Hostinger-Verteilung wird vorbereitet und lokal getestet; **keine** OTA-Freigabe hochgeladen. Vorheriger Firebase-Hosting-Testendpunkt bleibt ungenutzt und ist aus dem Repository als OTA-Quelle entfernt. Keine Play-Store-Veröffentlichung durch diese Umstellung. Die bereits gebaute 0.7.2-Debug-APK mit Firebase-Update-URL muss ersetzt werden. Offene Prüfungen: Android-Gerät, ZIP-Download/HTTPS/CORS/Watchdog und `npm audit`.

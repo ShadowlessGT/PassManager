@@ -1,8 +1,8 @@
 /**
  * EXPLICIT promotion of an Android-tested, signed candidate to the local
- * Firebase Hosting publication folder. This script does NOT deploy.
+ * Hostinger OTA upload staging folder. This script does NOT deploy.
  *
- * node scripts/ota-stage-hosting.mjs --version 0.7.3 --approve-tested-android-update
+ * node scripts/ota-stage-hostinger.mjs --version 0.7.3 --approve-tested-android-update
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
@@ -30,5 +30,6 @@ copyFileSync(srcZip, join(dst, 'bundles', filename));
 // Update the mutable stable channel last; older zip assets are preserved.
 copyFileSync(join(staging, 'stable.json'), join(dst, 'stable.json'));
 console.log('Approved signed OTA staged for deployment: ' + version);
-console.log('NEXT STEP (manual): firebase deploy --only hosting --project password-manager-parola');
+console.log('NEXT STEP (read only): npm run ota:probe');
+console.log('After real Android QA: npm run ota:publish -- --version ' + version + ' --approve-tested-android-update');
 console.log('WARNING: Only do so AFTER confirming live Android QA and protected vault backups.');

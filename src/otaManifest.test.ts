@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import {
-  canonicalOtaRelease, compareOtaVersions, verifyOtaManifest,
+  canonicalOtaRelease, compareOtaVersions, verifyOtaManifest, OTA_MANIFEST_URL,
 } from './otaManifest';
 import type { OtaRelease } from './otaManifest';
 
@@ -10,7 +10,7 @@ const release: OtaRelease = {
   minNativeCode: 19,
   maxNativeCode: 19,
   publishedAt: '2026-11-09T08:00:00.000Z',
-  zipUrl: 'https://password-manager-parola.web.app/ota/android/bundles/parola-web-0.7.3-abc123.zip',
+  zipUrl: 'https://parola.shadowless-studios.eu/ota/android/bundles/parola-web-0.7.3-abc123.zip',
   sha256: 'a'.repeat(64),
   sizeBytes: 125000,
   notes: 'UI improvements',
@@ -27,6 +27,9 @@ function signed(item = release) {
 }
 
 describe('Parola OTA signed release gate', () => {
+  it('only checks the existing Hostinger Parola site', () => {
+    expect(OTA_MANIFEST_URL).toBe('https://parola.shadowless-studios.eu/ota/android/stable.json');
+  });
   it('accepts a properly signed, native-compatible release', async () => {
     expect(await verifyOtaManifest(signed(), verificationKey)).toEqual(release);
   });
