@@ -18,6 +18,7 @@ dependencies {
     implementation project(':capacitor-clipboard')
     implementation project(':capacitor-filesystem')
     implementation project(':capacitor-privacy-screen')
+    implementation project(':capgo-capacitor-updater')
 
 }
 

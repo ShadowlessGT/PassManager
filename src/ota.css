@@ -1,0 +1,37 @@
+/* OTA prompt lives above the tab bar and never blocks vault interaction. */
+.ota-update-notice {
+  position: fixed;
+  inset-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  bottom: calc(87px + env(safe-area-inset-bottom));
+  width: min(440px, calc(100vw - 24px));
+  margin-inline: auto;
+  z-index: 110;
+  border: 1px solid #476999;
+  border-radius: 17px;
+  padding: 16px 17px;
+  background: #101e37f8;
+  color: #f4f7ff;
+  box-shadow: 0 12px 38px #0009;
+  backdrop-filter: blur(18px);
+  text-align: start;
+}
+.ota-update-heading { display: flex; gap: 10px; align-items: center; }
+.ota-update-heading > strong { flex: 1; font-size: 14px; line-height: 1.4; }
+.ota-update-notice p { font-size: 12px; line-height: 1.5; color: #d2e0f2; margin: 10px 0 5px; }
+.ota-update-notice small { display: block; color: #afc3dc; font-size: 11px; line-height: 1.5; }
+.ota-update-notice .ota-update-error { color: #ffb6b6; }
+.ota-update-dismiss { display: grid; place-items: center; color: inherit; border: 0; background: none; padding: 5px; }
+.ota-update-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.ota-update-actions button { min-height: 42px; border-radius: 10px; padding: 8px 12px; color: inherit; background: #243b5d; border: 1px solid #456080; font-size: 12px; font-weight: 720; }
+.ota-update-actions .ota-update-primary { display: inline-flex; gap: 7px; align-items: center; justify-content: center; background: #1766e8; border-color: #1766e8; color: white; }
+html[data-theme="light"] .ota-update-notice {
+  background: #f8fbfffa; color: #183252; border-color: #afc8eb; box-shadow: 0 12px 38px #18325233;
+}
+html[data-theme="light"] .ota-update-notice p { color: #34506d; }
+html[data-theme="light"] .ota-update-notice small { color: #536f8f; }
+html[data-theme="light"] .ota-update-actions button:not(.ota-update-primary) { background: #e9f1ff; color: #173251; border-color: #b7cee9; }
+html[data-theme="light"] .ota-update-notice .ota-update-error { color: #af1532; }
+@media (max-width: 390px) {
+  .ota-update-notice { padding: 13px; }
+  .ota-update-heading > strong { font-size: 13px; }
+}

@@ -1,7 +1,7 @@
 {
     "name": "passmanager",
     "private": true,
-    "version": "0.7.1",
+    "version": "0.7.2",
     "type": "module",
     "scripts": {
         "dev": "vite --host 0.0.0.0",
@@ -12,7 +12,13 @@
         "android:open": "npx cap open android",
         "test": "vitest run",
         "test:rules": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-firestore-rules.ps1",
-        "build:site": "vite build --config vite.site.config.ts"
+        "build:site": "vite build --config vite.site.config.ts",
+        "ota:bundle": "npm run build && node scripts/ota-release.mjs",
+        "ota:verify": "node scripts/ota-verify.mjs",
+        "ota:stage": "node scripts/ota-stage-hostinger.mjs",
+        "ota:probe": "python scripts/ota-hostinger-upload.py --probe",
+        "ota:publish": "python scripts/ota-hostinger-upload.py --publish",
+        "ota:prepare": "python scripts/ota-hostinger-upload.py --prepare"
     },
     "dependencies": {
         "@aparajita/capacitor-biometric-auth": "^10.0.0",
@@ -26,6 +32,7 @@
         "@capacitor/core": "8.5.2",
         "@capacitor/filesystem": "^8.1.0",
         "@capacitor/privacy-screen": "^2.0.1",
+        "@capgo/capacitor-updater": "^8.54.2",
         "firebase": "^12.0.0",
         "lucide-react": "^0.468.0",
         "react": "^19.1.0",
@@ -40,6 +47,7 @@
         "@vitejs/plugin-react": "^5.0.0",
         "typescript": "^5.9.0",
         "vite": "^7.1.0",
-        "vitest": "^3.2.0"
+        "vitest": "^3.2.0",
+        "yazl": "^3.3.1"
     }
 }

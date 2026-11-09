@@ -99,3 +99,7 @@ no additional Python dependencies.
 Run `DEPLOY_SITE.cmd probe` for a **read-only connection** and version
 comparison. After successful verification, `DEPLOY_SITE.cmd publish`
 uploads only changed files, then updates the remote version manifest last.
+
+## Getrennter Hostinger-OTA-Upload
+
+`DEPLOY_SITE.cmd` verwaltet **ausschließlich** die öffentliche Parola-Webseite. Signierte Android-Web-Updates werden separat über `DEPLOY_OTA.cmd` verwaltet, ohne die Landingpage zu überschreiben: **[1]** lesende Prüfung, **[2]** HTTPS-Konfiguration und signiertes ZIP vorbereiten (kein Update aktiv), **[3]** nur nach erfolgreichem Android-Gerätetest die signierte `stable.json` zuletzt live schalten. Vollständige Anleitung: `docs/SECURE_OTA_UPDATES.md`.
