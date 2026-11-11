@@ -95,3 +95,23 @@ export function makeLoginEntry({ siteUrl, username, password }) {
     createdAt: now, updatedAt: now, passwordChangedAt: now, fields: []
   };
 }
+
+
+/**
+ * Preserve the existing entry ID, custom fields, categories and password history.
+ * Mirrors src/insights.ts: old passwords are retained only when explicitly enabled.
+ */
+export function replaceLogin(existing, username, password, now = Date.now()) {
+  const changed = existing.password !== password;
+  const previousHistory = existing.passwordHistory ?? [];
+  const history = existing.keepPasswordHistory && changed && existing.password
+    ? [...previousHistory, { value: existing.password, replacedAt: now }].slice(-10)
+    : existing.keepPasswordHistory ? previousHistory : [];
+  return {
+    ...existing, username,
+    email: username.includes('@') ? username : existing.email,
+    password, updatedAt: now,
+    passwordChangedAt: changed ? now : existing.passwordChangedAt,
+    passwordHistory: history
+  };
+}
