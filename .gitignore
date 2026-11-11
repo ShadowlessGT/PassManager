@@ -459,3 +459,9 @@ android/gradle-local.err
 /ota-public/ota/android/stable.json
 /ota-public/ota/android/bundles/
 /ota-staging/
+
+# Windows Tauri and local WebExtension packages
+/browser-build/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+/desktop/src-tauri/.tauri/
