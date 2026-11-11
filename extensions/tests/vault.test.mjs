@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import {
   KDF_ITERATIONS, unlockKey, encryptVault, decryptVault,
-  matchesWebsite, credentialsForPage, makeLoginEntry, validateEnvelope
+  matchesWebsite, credentialsForPage, makeLoginEntry, replaceLogin, validateEnvelope
 } from '../shared/vault.mjs';
 import { writeCloudVault, readCloudVault } from '../shared/firebase-rest.mjs';
 
@@ -117,5 +117,25 @@ describe('Independent PBKDF2/AES-GCM compatibility fixture', () => {
     assert.deepEqual(await decryptVault(fixture, key), { version: 1, entries: [] });
     const incorrect = await unlockKey('Wrong-Password', fixture);
     await assert.rejects(decryptVault(fixture, incorrect));
+  });
+});
+
+describe('Existing vault entry compatibility', () => {
+  it('keeps user categories, custom fields and optional password history', () => {
+    const existing = makeLoginEntry({
+      siteUrl: 'https://example.test', username: 'old@example.test', password: 'old'
+    });
+    existing.categories = ['Work'];
+    existing.fields = [{ id: 'f', label: 'PIN', kind: 'pin', value: '1234', createdAt: 1, updatedAt: 1 }];
+    existing.keepPasswordHistory = true;
+    const updated = replaceLogin(existing, 'new@example.test', 'new', 123456789);
+    assert.equal(updated.id, existing.id);
+    assert.deepEqual(updated.categories, ['Work']);
+    assert.deepEqual(updated.fields, existing.fields);
+    assert.equal(updated.password, 'new');
+    assert.deepEqual(updated.passwordHistory, [{ value: 'old', replacedAt: 123456789 }]);
+    existing.keepPasswordHistory = false;
+    const noHistory = replaceLogin(existing, 'old@example.test', 'new');
+    assert.deepEqual(noHistory.passwordHistory, []);
   });
 });
