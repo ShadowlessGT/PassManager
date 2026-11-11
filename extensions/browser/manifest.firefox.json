@@ -3,14 +3,27 @@
   "name": "Parola – Passwort-Tresor",
   "description": "Verschlüsselter Parola-Tresor: Logins per Zustimmung speichern und auf HTTPS-Seiten einfüllen.",
   "version": "0.1.0",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
   "host_permissions": [
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*",
     "https://firestore.googleapis.com/*"
   ],
-  "action": { "default_title": "Parola", "default_popup": "popup.html" },
+  "action": {
+    "default_title": "Parola",
+    "default_popup": "popup.html"
+  },
   "browser_specific_settings": {
-    "gecko": { "id": "parola@shadowless-studios.eu", "strict_min_version": "115.0" }
+    "gecko": {
+      "id": "parola@shadowless-studios.eu",
+      "strict_min_version": "115.0"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com"
   }
 }
