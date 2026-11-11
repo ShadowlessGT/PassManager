@@ -100,3 +100,22 @@ describe('Parola WebExtension zero-knowledge compatibility', () => {
     } finally { globalThis.fetch = previousFetch; }
   });
 });
+
+
+describe('Independent PBKDF2/AES-GCM compatibility fixture', () => {
+  it('decrypts a known Python/OpenSSL-compatible fixture with Android envelope v1', async () => {
+    // Derived independently using hashlib.pbkdf2_hmac('sha256', ..., 600000, 32)
+    // and AESGCM.encrypt(nonce, b'{"version":1,"entries":[]}', None).
+    const fixture = {
+      v: 1, iterations: 600000,
+      salt: 'AAECAwQFBgcICQoLDA0ODw==',
+      nonce: 'EBESExQVFhcYGRob',
+      ciphertext: 'RJa55B5EIzONLbbCusjBLAQMIA75tijSeHXAvQOTGjbTACAB2f2MdECE',
+      updatedAt: 1
+    };
+    const key = await unlockKey('Parola-Interop-Dummy-2026!', fixture);
+    assert.deepEqual(await decryptVault(fixture, key), { version: 1, entries: [] });
+    const incorrect = await unlockKey('Wrong-Password', fixture);
+    await assert.rejects(decryptVault(fixture, incorrect));
+  });
+});
