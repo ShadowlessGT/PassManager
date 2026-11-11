@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "parola-main",
+  "description": "Parola's local vault UI needs no privileged Rust commands.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": []
+}
