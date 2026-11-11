@@ -1,6 +1,6 @@
 import { FIREBASE_CONFIG } from './config.mjs';
 import { signIn, refreshSession, readCloudVault, writeCloudVault } from './firebase-rest.mjs';
-import { unlockKey, decryptVault, encryptVault, credentialsForPage, matchesWebsite, makeLoginEntry } from './vault.mjs';
+import { unlockKey, decryptVault, encryptVault, credentialsForPage, matchesWebsite, makeLoginEntry, replaceLogin } from './vault.mjs';
 
 // Popup lifetime = unlocked lifetime. Never persist the master password,
 // derived key, decrypted vault, captured login or a pending edit.
@@ -278,9 +278,7 @@ $('save').addEventListener('click', () => safeRun(async () => {
   if (previous && !window.confirm('Bereits vorhandenen Login für diese Webseite und diesen Benutzer aktualisieren?')) {
     throw new Error('Überschreiben abgebrochen');
   }
-  const updatedEntry = previous ? {
-    ...previous, username, password, updatedAt: Date.now(), passwordChangedAt: Date.now()
-  } : incoming;
+  const updatedEntry = previous ? replaceLogin(previous, username, password) : incoming;
   const updatedVault = {
     ...vault,
     entries: previous
