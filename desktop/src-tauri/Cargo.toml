@@ -1,0 +1,13 @@
+[package]
+name = "parola_desktop"
+version = "0.7.2"
+description = "Parola encrypted password vault for Windows"
+authors = ["Shadowless Studios"]
+edition = "2021"
+build = "build.rs"
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+tauri = { version = "2" }
