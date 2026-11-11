@@ -18,7 +18,7 @@ Eine Parola-Identität, ein Master-Passwort und **ein verschlüsseltes Firebase-
 | Lokale Browser-Builds | `BUILD_EXTENSIONS.cmd` / `npm run extension:build` | Implementiert, auf echtem PC auszuführen |
 | Verschlüsselter Cloud-Schreibweg aus Erweiterung | `extensions/shared/firebase-rest.mjs` | Implementiert, echte Firestore-E2E-Prüfung ausstehend |
 | Formfelder nur auf Nutzerklick auslesen und einfüllen | `extensions/browser/popup.mjs` | Implementiert, Browser-QA ausstehend |
-| Formularnachricht nach Login, optional automatische Speicherbestätigung | Noch nicht implementiert | Nächster sicherheitsrelevanter Arbeitsschritt |
+| Formularnachricht nach Login-Versuch für einzeln erlaubte HTTPS-Seiten | Prototyp implementiert | Browser-E2E und Sicherheitsreview offen |
 | Synchronisierung ohne manuelles Upload/Download | Noch nicht implementiert | Eigenes Arbeitspaket |
 
 ## Priorität 1 – Sicherheitsgrundlagen / Testen
@@ -62,3 +62,7 @@ Eine Parola-Identität, ein Master-Passwort und **ein verschlüsseltes Firebase-
 ## Bestehenden Android-Produktionsstand nicht gefährden
 
 Die neuen Dateien leben in getrennten `desktop/`- und `extensions/`-Ordnern. Keine Änderung an Android-Datenformat, Play-Produkt, Google Play Track, Firebase-Regeln, Firebase Functions, Hostinger-OTA oder Parola-Webseite ist nötig. Die mobilen Tresordaten werden **nicht** migriert, solange die Tests offen sind.
+
+## Browser-Store Stand 11.11.2026
+
+Chrome- und Firefox-MV3-Entwicklungsversion **0.2.0** mit optionalem Einzelseiten-Login-Wächter, Bestätigungsbanner und vorbereiteter Google-Firebase-Anmeldung. Die Google OAuth-Client-IDs fehlen aktuell und müssen pro Browser konfiguriert werden. Tests nur lokal mit Dummydaten, keine Chrome-/Firefox-Store-Veröffentlichung. Siehe `extensions/STORE_SUBMISSION.md`.

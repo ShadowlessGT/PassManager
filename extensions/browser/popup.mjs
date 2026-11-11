@@ -1,4 +1,5 @@
 import { FIREBASE_CONFIG } from './config.mjs';
+import { signInGoogleWithFirebase } from './google-auth.mjs';
 import { signIn, refreshSession, readCloudVault, writeCloudVault } from './firebase-rest.mjs';
 import { unlockKey, decryptVault, encryptVault, credentialsForPage, matchesWebsite, makeLoginEntry, replaceLogin } from './vault.mjs';
 
@@ -14,6 +15,8 @@ let cloudRevision = null;
 let pendingCapture = null;
 let activePage = null;
 let busy = false;
+let activeWatchEnabled = false;
+const reviewMode = new URLSearchParams(location.search).get('review') === '1';
 
 function status(message, isError = false) {
   $('status').textContent = message;
@@ -59,13 +62,56 @@ async function tabForPage() {
 }
 async function refreshPage() {
   try {
+    if (reviewMode) {
+      const result = await ext.runtime.sendMessage({ type: 'PAROLA_GET_PENDING_FROM_POPUP' });
+      if (!result?.candidate) throw new Error('No pending login');
+      const { origin, tabId } = result.candidate;
+      const tab = await ext.tabs.get(tabId);
+      if (new URL(tab.url).origin !== origin) throw new Error('Login page changed');
+      activePage = { id: tabId, url: tab.url, origin, hostname: new URL(origin).hostname };
+      $('site-label').textContent = activePage.hostname;
+      return;
+    }
     activePage = await tabForPage();
     $('site-label').textContent = activePage.hostname;
+    await updateWatchUi();
   } catch {
     activePage = null;
     $('site-label').textContent = 'Kein unterstützter HTTPS-Tab geöffnet';
   }
 }
+function watchRegistrationId(origin) {
+  // Stable per-domain ID; avoid putting hostname in extension registration IDs.
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(origin))
+    .then(buffer => 'parola-' + Array.from(new Uint8Array(buffer)).slice(0, 12)
+      .map(b => b.toString(16).padStart(2, '0')).join(''));
+}
+async function updateWatchUi() {
+  const btn = $('watch-site');
+  if (!btn) return;
+  btn.hidden = !activePage || reviewMode;
+  if (!activePage || reviewMode) return;
+  const saved = await ext.storage.local.get('parolaAllowedOrigins');
+  activeWatchEnabled = (saved.parolaAllowedOrigins || []).includes(activePage.origin) &&
+    await ext.permissions.contains({ origins: [activePage.origin + '/*'] });
+  btn.textContent = activeWatchEnabled
+    ? 'Automatische Login-Nachfrage auf dieser Website deaktivieren'
+    : 'Automatische Login-Nachfrage auf dieser Website erlauben';
+}
+async function loadPendingAfterUnlock() {
+  if (!reviewMode) return;
+  const result = await ext.runtime.sendMessage({ type: 'PAROLA_GET_PENDING_FROM_POPUP' });
+  const pending = result?.candidate;
+  if (!pending || !activePage || pending.origin !== activePage.origin ||
+      pending.tabId !== activePage.id) return;
+  pendingCapture = { ...pending, siteUrl: pending.origin };
+  $('review-site').textContent = pending.origin;
+  $('review-username').value = pending.username;
+  $('review-password').value = pending.password;
+  $('review').hidden = false;
+  status('Login erkannt. Erst nach der Bestätigung wird verschlüsselt gespeichert.');
+}
+
 function drawMatches() {
   const container = $('matches');
   container.replaceChildren();
@@ -223,6 +269,7 @@ async function unlock() {
   showSection('vault-section');
   drawMatches();
   status('Verschlüsselten Cloud-Tresor geöffnet. ' + vault.entries.length + ' Einträge.');
+  await loadPendingAfterUnlock();
 }
 $('unlock-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -235,6 +282,7 @@ $('lock').addEventListener('click', () => {
 });
 $('logout').addEventListener('click', () => safeRun(async () => {
   await (await sessionStore()).remove('parolaAuth');
+  await ext.runtime.sendMessage({ type: 'PAROLA_CLEAR_PENDING_FROM_POPUP' });
   authSession = null;
   lockVault();
   status('Firebase-Sitzung beendet.');
@@ -258,14 +306,56 @@ $('capture').addEventListener('click', () => safeRun(async () => {
   status('Login erkannt. Erst mit „Verschlüsselt in Firebase speichern“ bestätigen.');
 }));
 $('cancel').addEventListener('click', () => {
+  if (reviewMode) void ext.runtime.sendMessage({ type: 'PAROLA_CLEAR_PENDING_FROM_POPUP' });
   clearReview(); status('Übernahme verworfen.');
+});
+$('google-login').addEventListener('click', () => safeRun(async () => {
+  const session = await signInGoogleWithFirebase(FIREBASE_CONFIG);
+  await saveSession(session);
+  showSection('unlock-section');
+  status('Google-Konto über Firebase bestätigt. Jetzt Parola-Master-Passwort eingeben.');
+}));
+$('watch-site').addEventListener('click', () => {
+  if (!vault || !authSession || !activePage || reviewMode) return;
+  const origin = activePage.origin;
+  // Browser permission request is invoked immediately in a genuine user click.
+  const permissionPromise = activeWatchEnabled
+    ? Promise.resolve(true)
+    : ext.permissions.request({ origins: [origin + '/*'] });
+  void safeRun(async () => {
+    const ok = await permissionPromise;
+    if (!ok) throw new Error('Webseitenzugriff wurde nicht erlaubt.');
+    const saved = await ext.storage.local.get('parolaAllowedOrigins');
+    const origins = new Set(saved.parolaAllowedOrigins || []);
+    const id = await watchRegistrationId(origin);
+    if (activeWatchEnabled) {
+      origins.delete(origin);
+      await ext.storage.local.set({ parolaAllowedOrigins: [...origins] });
+      try { await ext.scripting.unregisterContentScripts({ ids: [id] }); }
+      catch { /* May have been removed by extension update */ }
+      await ext.permissions.remove({ origins: [origin + '/*'] });
+      status('Automatische Login-Erkennung für diese Website deaktiviert.');
+    } else {
+      const old = await ext.scripting.getRegisteredContentScripts({ ids: [id] });
+      if (!old.length) await ext.scripting.registerContentScripts([{
+        id, matches: [origin + '/*'], js: ['watch-login.js'],
+        runAt: 'document_idle', allFrames: false, persistAcrossSessions: true
+      }]);
+      origins.add(origin);
+      await ext.storage.local.set({ parolaAllowedOrigins: [...origins] });
+      await ext.scripting.executeScript({ target: { tabId: activePage.id }, files: ['watch-login.js'] });
+      status('Für diese Website aktiviert: Nach Login-Versuchen fragt Parola nach.');
+    }
+    await updateWatchUi();
+  });
 });
 $('save').addEventListener('click', () => safeRun(async () => {
   if (!vault || !vaultKey || !encryptedEnvelope || !cloudRevision || !pendingCapture) {
     throw new Error('Kein entsperrter Tresor oder keine geprüfte Vorschau');
   }
-  const page = await tabForPage();
-  if (pendingCapture.siteUrl !== page.origin) {
+  const page = reviewMode ? activePage : await tabForPage();
+  if (!page || pendingCapture.siteUrl !== page.origin ||
+      new URL((await ext.tabs.get(page.id)).url).origin !== page.origin) {
     throw new Error('Die Webseite hat gewechselt, Speichern wurde abgebrochen');
   }
   const username = $('review-username').value.trim();
@@ -289,6 +379,7 @@ $('save').addEventListener('click', () => safeRun(async () => {
   const encrypted = await encryptVault(updatedVault, vaultKey, encryptedEnvelope.salt);
   const session = await validSession();
   await writeCloudVault(FIREBASE_CONFIG, session, encrypted, cloudRevision);
+  if (reviewMode) await ext.runtime.sendMessage({ type: 'PAROLA_CLEAR_PENDING_FROM_POPUP' });
   clearReview();
   lockVault(); // Re-unlock is required to fetch the new revision and avoid stale edits.
   status('Login verschlüsselt in Firebase gespeichert. Auf Android Cloud-Tresor erneut herunterladen.');

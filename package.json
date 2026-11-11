@@ -19,7 +19,7 @@
         "ota:probe": "python scripts/ota-hostinger-upload.py --probe",
         "ota:publish": "python scripts/ota-hostinger-upload.py --publish",
         "ota:prepare": "python scripts/ota-hostinger-upload.py --prepare",
-        "test:extension": "node --test extensions/tests/vault.test.mjs",
+        "test:extension": "node --test extensions/tests/*.test.mjs",
         "extension:build": "node scripts/build-browser-extensions.mjs"
     },
     "dependencies": {

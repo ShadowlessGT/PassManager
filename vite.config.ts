@@ -5,5 +5,5 @@ export default defineConfig({
   plugins: [react()],
   build: { target: 'es2022', rollupOptions: { input: { app: 'index.html', accountDeletion: 'delete-account.html' } } },
   server: { host: '0.0.0.0' },
-  test: { exclude: [...configDefaults.exclude, 'functions/**'] }
+  test: { exclude: [...configDefaults.exclude, 'functions/**', 'extensions/**'] }
 });

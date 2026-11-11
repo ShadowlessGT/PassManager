@@ -14,6 +14,9 @@
     <section id="login-section">
       <h1>Mit Firebase verbinden</h1>
       <p>Dasselbe Konto wie in Parola auf Android verwenden.</p>
+      <button id="google-login" type="button" class="primary">Mit Google anmelden</button>
+      <p class="hint">Google authentifiziert dein Firebase-Konto; das Parola-Master-Passwort bleibt separat.</p>
+      <p class="hint">Alternativ mit dem bestehenden Firebase-Kontopasswort:</p>
       <form id="login-form">
         <label>E-Mail <input id="email" type="email" autocomplete="username" required></label>
         <label>Firebase-Kontopasswort <input id="account-password" type="password" autocomplete="current-password" required></label>
@@ -31,8 +34,9 @@
     <section id="vault-section" hidden>
       <h1>Diese Webseite</h1>
       <p id="site-label" class="site-label"></p>
+      <button id="watch-site" type="button">Automatische Login-Nachfrage für diese Website erlauben</button>
       <button id="capture" type="button" class="secondary">Ausgefüllten Login erkennen</button>
-      <p class="hint">Nur per Klick; es werden keine anderen Webseiten überwacht.</p>
+      <p class="hint">Automatische Erkennung nur für Webseiten mit deiner einmaligen Berechtigung. Login-Daten werden nach dem Absenden maximal zwei Minuten im Browser-Arbeitsspeicher zwischengespeichert, bis du ausdrücklich zustimmst.</p>
       <div id="review" hidden>
         <h2>Neuen Login übernehmen?</h2>
         <p id="review-site"></p>
@@ -49,7 +53,7 @@
       <button id="reload" type="button">Cloud-Stand neu laden</button>
       <button id="lock" type="button">Tresor sperren</button>
     </section>
-    <footer>Parola · Nur verschlüsselte Firestore-Tresordaten</footer>
+    <footer>Cloud-Tresor Ende-zu-Ende verschlüsselt (AES-256-GCM). Firebase erhält nur verschlüsselte Inhalte. Die Sicherheit hängt auch von deinem Master-Passwort und Gerät ab.</footer>
   </main>
   <script type="module" src="popup.mjs"></script>
 </body>

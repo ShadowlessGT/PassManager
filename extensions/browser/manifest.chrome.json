@@ -2,11 +2,12 @@
   "manifest_version": 3,
   "name": "Parola – Passwort-Tresor",
   "description": "Verschlüsselter Parola-Tresor: Logins per Zustimmung speichern und auf HTTPS-Seiten einfüllen.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "identity"
   ],
   "host_permissions": [
     "https://identitytoolkit.googleapis.com/*",
@@ -15,9 +16,25 @@
   ],
   "action": {
     "default_title": "Parola",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com"
+  },
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
