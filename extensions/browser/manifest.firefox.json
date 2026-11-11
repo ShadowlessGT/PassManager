@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Parola – Passwort-Tresor",
+  "description": "Verschlüsselter Parola-Tresor: Logins per Zustimmung speichern und auf HTTPS-Seiten einfüllen.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://firestore.googleapis.com/*"
+  ],
+  "action": { "default_title": "Parola", "default_popup": "popup.html" },
+  "browser_specific_settings": {
+    "gecko": { "id": "parola@shadowless-studios.eu", "strict_min_version": "115.0" }
+  }
+}
