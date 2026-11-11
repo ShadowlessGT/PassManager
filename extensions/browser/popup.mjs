@@ -228,7 +228,7 @@ $('unlock-form').addEventListener('submit', e => {
   e.preventDefault();
   void safeRun(unlock);
 });
-$('reload').addEventListener('click', () => safeRun(unlock)); // Requires master password again.
+$('reload').addEventListener('click', () => { lockVault(); status('Cloud-Stand aktualisieren: Master-Passwort erneut eingeben.'); });
 $('lock').addEventListener('click', () => {
   lockVault();
   status('Tresor gesperrt. Schlüssel aus dem geöffneten Fenster entfernt.');
