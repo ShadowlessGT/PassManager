@@ -66,3 +66,5 @@ No password manager can guarantee absolute security. Device compromise and weak 
 - Google-Dienstkontoschlüssel und Master-Passwort in Firebase: **nein**.
 
 Die finalen Angaben müssen mit tatsächlichem Verhalten, Datenschutzerklärung und Store-Richtlinien geprüft werden. Eine Store-Prüfung ersetzt keinen unabhängigen Sicherheitscheck.
+
+**Aktuelle Zugriffsregel:** Automatische Login-Erkennung nur nach einer in Firebase bestätigten Google-Anmeldung (`provider: google.com`) plus ausdrücklicher Webseitenfreigabe. E-Mail/Passwort-Firebase-Sitzungen erlauben weiterhin manuelles Arbeiten, aber keinen automatischen Login-Wächter.

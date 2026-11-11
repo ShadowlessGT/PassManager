@@ -317,6 +317,10 @@ $('google-login').addEventListener('click', () => safeRun(async () => {
 }));
 $('watch-site').addEventListener('click', () => {
   if (!vault || !authSession || !activePage || reviewMode) return;
+  if (authSession.provider !== 'google.com') {
+    status('Für automatische Login-Nachfragen bitte mit Google bei Firebase anmelden.', true);
+    return;
+  }
   const origin = activePage.origin;
   // Browser permission request is invoked immediately in a genuine user click.
   const permissionPromise = activeWatchEnabled

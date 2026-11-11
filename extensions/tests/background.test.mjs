@@ -58,11 +58,19 @@ describe('Automatic Parola login capture user authorization', () => {
   const query = {type:'PAROLA_CHECK_PENDING', origin:'https://example.test'};
   const sender = {id:'parola-test-extension',frameId:0,
     url:'https://example.test/login',tab:{id:7,url:'https://example.test/login'}};
+  it('rejects automatic password capture for non-Google Firebase sessions', async () => {
+    const x=harness();
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'password'};
+    x.local.parolaAllowedOrigins=['https://example.test'];
+    x.allowed.add('https://example.test/*');
+    assert.equal((await x.message(attempt,sender)).ok,undefined);
+    assert.equal(x.session.parolaPending,undefined);
+  });
   it('does not capture before Firebase sign-in and per-site permission', async () => {
     const x=harness();
     assert.equal((await x.message(attempt,sender)).ok, undefined);
     assert.equal(x.session.parolaPending, undefined);
-    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only'};
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'google.com'};
     assert.equal((await x.message(attempt,sender)).ok, undefined);
     x.local.parolaAllowedOrigins=['https://example.test'];
     x.allowed.add('https://example.test/*');
@@ -71,7 +79,7 @@ describe('Automatic Parola login capture user authorization', () => {
   });
   it('will not expose captured secret to a content script, even on same site', async () => {
     const x=harness();
-    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only'};
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'google.com'};
     x.local.parolaAllowedOrigins=['https://example.test'];
     x.allowed.add('https://example.test/*');
     await x.message(attempt,sender);
@@ -83,7 +91,7 @@ describe('Automatic Parola login capture user authorization', () => {
   });
   it('only extension-owned pages can access review credentials', async () => {
     const x=harness();
-    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only'};
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'google.com'};
     x.local.parolaAllowedOrigins=['https://example.test'];
     x.allowed.add('https://example.test/*');
     await x.message(attempt,sender);
@@ -96,7 +104,7 @@ describe('Automatic Parola login capture user authorization', () => {
   });
   it('discards stale captures and blocks invalid/HTTP origins', async () => {
     const x=harness();
-    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only'};
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'google.com'};
     x.local.parolaAllowedOrigins=['https://example.test'];
     x.allowed.add('https://example.test/*');
     assert.equal((await x.message({...attempt,origin:'http://example.test'},sender)).ok,undefined);
@@ -107,7 +115,7 @@ describe('Automatic Parola login capture user authorization', () => {
   });
   it('opens review only after user request and discards on dismiss', async () => {
     const x=harness();
-    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only'};
+    x.session.parolaAuth={uid:'dummy123',refreshToken:'test-only',provider:'google.com'};
     x.local.parolaAllowedOrigins=['https://example.test'];
     x.allowed.add('https://example.test/*');
     await x.message(attempt,sender);

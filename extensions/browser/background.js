@@ -49,7 +49,7 @@
     if (!origin || !sender.url?.startsWith(origin + '/') || !await isAllowed(origin)) return {};
     if (msg.type === 'PAROLA_LOGIN_ATTEMPT') {
       const auth = (await ext.storage.session.get('parolaAuth')).parolaAuth;
-      if (!auth?.uid || !auth?.refreshToken) return {};
+      if (!auth?.uid || !auth?.refreshToken || auth.provider !== 'google.com') return {};
       if (typeof msg.username !== 'string' || typeof msg.password !== 'string' ||
           !msg.username.trim() || msg.username.length > 512 ||
           msg.password.length < 1 || msg.password.length > 8192) return {};

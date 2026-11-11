@@ -34,6 +34,7 @@ describe('Google -> Firebase authentication guard', () => {
         projectId:'password-manager-parola',apiKey:'FAKE_TEST_API_KEY'
       });
       assert.equal(session.uid,'dummyUid');
+      assert.equal(session.provider,'google.com');
       assert.equal(session.idToken,'TEST_FIREBASE_ID');
       assert.equal(requests.length,1);
       assert.match(requests[0].url,/identitytoolkit.googleapis.com/);

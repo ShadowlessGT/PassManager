@@ -85,3 +85,5 @@ Offiziell: https://www.extensionworkshop.com/documentation/publish/submitting-an
 ### Firefox Berechtigungen und Mindestversion
 
 Firefox benötigt mindestens Version **142.0**, damit die neue Mozilla-Dateneinwilligung korrekt verarbeitet wird. Das Manifest deklariert die für Parola tatsächlich verarbeiteten Kategorien **authenticationInfo**, **personallyIdentifyingInfo** und **browsingActivity** als erforderlich; der Zugriff auf konkrete HTTPS-Webseiten wird zusätzlich nur bei ausdrücklicher Webseitenfreigabe angefordert. Der Mozilla-Linter meldet derzeit null Fehler und null Warnungen.
+
+**Aktuelle Zugriffsregel:** Automatische Login-Erkennung nur nach einer in Firebase bestätigten Google-Anmeldung (`provider: google.com`) plus ausdrücklicher Webseitenfreigabe. E-Mail/Passwort-Firebase-Sitzungen erlauben weiterhin manuelles Arbeiten, aber keinen automatischen Login-Wächter.

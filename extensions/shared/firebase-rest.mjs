@@ -34,7 +34,7 @@ export async function signIn(config, email, password) {
     body: JSON.stringify({ email, password, returnSecureToken: true })
   });
   if (!data.idToken || !data.refreshToken || !data.localId) throw new Error('Ungültige Firebase-Antwort');
-  return { idToken: data.idToken, refreshToken: data.refreshToken, uid: data.localId,
+  return { provider: 'password', idToken: data.idToken, refreshToken: data.refreshToken, uid: data.localId,
     expiresAt: Date.now() + Math.max(60, Number(data.expiresIn) || 3600) * 1000 };
 }
 
@@ -51,7 +51,7 @@ export async function refreshSession(config, session) {
   if (!data.id_token || !data.refresh_token || data.user_id !== session.uid) {
     throw new Error('Firebase-Sitzung ungültig, bitte erneut anmelden');
   }
-  return { idToken: data.id_token, refreshToken: data.refresh_token, uid: session.uid,
+  return { provider: session.provider, idToken: data.id_token, refreshToken: data.refresh_token, uid: session.uid,
     expiresAt: Date.now() + Math.max(60, Number(data.expires_in) || 3600) * 1000 };
 }
 

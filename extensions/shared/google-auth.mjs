@@ -78,7 +78,7 @@ export async function signInGoogleWithFirebase(config) {
       const code = String(body?.error?.message || response.status).slice(0, 90);
       throw new Error('Firebase-Google-Anmeldung fehlgeschlagen (' + code + ')');
     }
-    return { idToken: body.idToken, refreshToken: body.refreshToken, uid: body.localId,
+    return { provider: 'google.com', idToken: body.idToken, refreshToken: body.refreshToken, uid: body.localId,
       expiresAt: Date.now() + Math.max(60, Number(body.expiresIn) || 3600) * 1000 };
   } finally {
     // No Google access token is written into browser.storage.
