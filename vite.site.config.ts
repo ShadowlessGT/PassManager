@@ -14,7 +14,8 @@ export default defineConfig({
         index: resolve(process.cwd(), 'site/index.html'),
         privacy: resolve(process.cwd(), 'site/privacy.html'),
         terms: resolve(process.cwd(), 'site/terms.html'),
-        deletion: resolve(process.cwd(), 'site/delete-account.html')
+        deletion: resolve(process.cwd(), 'site/delete-account.html'),
+        extensionLogin: resolve(process.cwd(), 'site/extension-login.html')
       }
     }
   }

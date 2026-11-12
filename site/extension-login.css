@@ -1,0 +1,5 @@
+html{background:#0b1326;color:#edf5ff;font:15px/1.55 system-ui,sans-serif;color-scheme:dark}
+body{min-height:90vh;display:grid;place-items:center;margin:0;padding:20px}
+main{max-width:460px;padding:32px;border:1px solid #294d7b;border-radius:20px;box-shadow:0 15px 60px #0005;background:#101e37}
+h1{font-size:22px;margin:0 0 9px}p{color:#c4d5ed}button{border:0;border-radius:10px;background:#2474e6;color:white;min-height:48px;font:600 15px system-ui;padding:10px 20px}
+button:disabled{opacity:.5}small{color:#aebfdb}#status{min-height:24px}

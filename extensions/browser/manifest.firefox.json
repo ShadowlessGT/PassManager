@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Parola – Passwort-Tresor",
   "description": "Verschlüsselter Parola-Tresor: Logins per Zustimmung speichern und auf HTTPS-Seiten einfüllen.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "permissions": [
     "activeTab",
     "scripting",
