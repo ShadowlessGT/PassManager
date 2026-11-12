@@ -37,7 +37,7 @@ import type { EncryptedEnvelope } from './crypto';
 import { verifyCloudVault, vaultRevision } from './cloudSafety';
 import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
-import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
+import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignInWithGoogle, cloudHasGoogleProvider, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 
 type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
@@ -564,8 +564,22 @@ export default function App() {
     finally { setCloudBusy(false); }
   }
 
+  async function signIntoCloudGoogle() {
+    setCloudBusy(true); setCloudError('');
+    try {
+      await cloudSignInWithGoogle();
+      setCloudLoginPassword('');
+      setCloudUser(cloudEmail());
+      setNotice('Google-Konto verbunden. Dein lokaler Tresor bleibt verschlüsselt.');
+    } catch {
+      setCloudError('Google-Anmeldung fehlgeschlagen oder abgebrochen. Bitte Firebase Google-Anmeldung und Android-Zertifikat prüfen.');
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
   async function deleteFirebaseAccount() {
-    if (!cloudUser || cloudBusy || !cloudDeletePassword) return;
+    if (!cloudUser || cloudBusy || (!cloudDeletePassword && !cloudHasGoogleProvider())) return;
     if (window.prompt('Zur endgültigen Löschung deines Firebase-Kontos und aller Cloud-Daten LÖSCHEN eingeben:') !== 'LÖSCHEN') return;
     setCloudBusy(true); setCloudError('');
     try {
@@ -912,15 +926,17 @@ export default function App() {
                 <div className="cloud-delete-account">
                   <strong>Firebase-Konto und Cloud-Daten löschen</strong>
                   <p className="settings-note">Entfernt das Firebase-Konto und die gespeicherte Cloud-Sicherung endgültig. Der lokale, verschlüsselte Tresor bleibt auf diesem Gerät bestehen. Zur Bestätigung ist eine erneute Anmeldung erforderlich.</p>
-                  <label>Firebase-Kontopasswort
+                  <p className="settings-note">Bei Google-Konten ist für die Löschung kein separates Firebase-Passwort nötig; die Google-Anmeldung wird erneut bestätigt.</p><label>Firebase-Kontopasswort
                     <input type="password" autoComplete="current-password" value={cloudDeletePassword} onChange={event => setCloudDeletePassword(event.target.value)} placeholder="Kontopasswort zur Löschung"/>
                   </label>
-                  <button type="button" className="danger-btn" disabled={cloudBusy || !cloudDeletePassword} onClick={() => void deleteFirebaseAccount()}>Firebase-Konto endgültig löschen</button>
+                  <button type="button" className="danger-btn" disabled={cloudBusy || (!cloudDeletePassword && !cloudHasGoogleProvider())} onClick={() => void deleteFirebaseAccount()}>Firebase-Konto endgültig löschen</button>
                 </div>
               </> : <div className="cloud-login">
                 <label>E-Mail<input type="email" autoComplete="username" value={cloudLoginEmail} onChange={e => setCloudLoginEmail(e.target.value)} placeholder="name@beispiel.de"/></label>
                 <label>{simple ? 'Passwort für dein Sicherungskonto' : 'Firebase-Kontopasswort'}<input type="password" autoComplete="current-password" value={cloudLoginPassword} onChange={e => setCloudLoginPassword(e.target.value)} placeholder="Firebase-Passwort"/></label>
                 <div className="cloud-buttons"><button className="primary-btn" disabled={cloudBusy || !cloudLoginEmail || !cloudLoginPassword} onClick={() => void signIntoCloud(false)}>Anmelden</button><button className="secondary-btn" disabled={cloudBusy || !cloudLoginEmail || cloudLoginPassword.length < 6} onClick={() => void signIntoCloud(true)}>Konto erstellen</button></div>
+                <button type="button" className="secondary-btn" disabled={cloudBusy} onClick={() => void signIntoCloudGoogle()}>Mit Google anmelden</button>
+                <p className="settings-note">Alternativ ohne zusätzliches Firebase-Passwort. Dein Masterpasswort und deine lokalen Passwörter bleiben unverändert.</p>
                 <p className="settings-note">Dein Sicherungskonto-Passwort und das Tresor-Passwort sind unabhängig voneinander.</p>
               </div>}
               {previousBackupAvailable && <button type="button" className="outline-btn" disabled={cloudBusy} onClick={() => void undoCloudRestore()}><ArrowDownToLine size={18}/> Vorherigen lokalen Tresor zurückholen</button>}
@@ -934,7 +950,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Passwort Manager: Parola v0.6.9 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">Passwort Manager: Parola v0.7.3 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>

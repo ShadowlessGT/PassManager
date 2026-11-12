@@ -1,5 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, GoogleAuthProvider, signInWithCredential, signInWithPopup, reauthenticateWithCredential, reauthenticateWithPopup, deleteUser } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getFirestore, doc, getDoc, runTransaction, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { EncryptedEnvelope } from './crypto';
@@ -24,6 +26,35 @@ export async function cloudSignIn(email: string, password: string, createAccount
   if (!auth) throw new Error('Firebase ist noch nicht konfiguriert.');
   if (createAccount) await createUserWithEmailAndPassword(auth, email, password);
   else await signInWithEmailAndPassword(auth, email, password);
+}
+
+export function cloudHasGoogleProvider(): boolean {
+  return Boolean(auth?.currentUser?.providerData.some(provider => provider.providerId === 'google.com'));
+}
+
+/** Google authenticates the optional cloud account, never the local encrypted vault. */
+export async function cloudSignInWithGoogle(): Promise<void> {
+  if (!auth) throw new Error('Firebase ist noch nicht konfiguriert.');
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    const idToken = result.credential?.idToken;
+    if (!idToken) throw new Error('Google hat kein gültiges Anmeldetoken zurückgegeben.');
+    await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+  } else {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  }
+}
+
+async function reauthenticateGoogleAccount(user: NonNullable<typeof auth>['currentUser']): Promise<void> {
+  if (!user) throw new Error('Kein Google-Konto angemeldet.');
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    const idToken = result.credential?.idToken;
+    if (!idToken) throw new Error('Google hat kein gültiges Anmeldetoken zurückgegeben.');
+    await reauthenticateWithCredential(user, GoogleAuthProvider.credential(idToken));
+  } else {
+    await reauthenticateWithPopup(user, new GoogleAuthProvider());
+  }
 }
 
 export async function cloudSignOut(): Promise<void> {
@@ -67,8 +98,13 @@ export function onCloudEmailChange(callback: (email: string | null) => void): ()
 export async function cloudDeleteAccount(accountPassword: string): Promise<void> {
   const user = auth?.currentUser;
   if (!user?.email || !db) throw new Error('Bitte zuerst bei Firebase anmelden.');
-  if (!accountPassword) throw new Error('Kontopasswort erforderlich.');
-  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, accountPassword));
+  if (accountPassword) {
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, accountPassword));
+  } else if (cloudHasGoogleProvider()) {
+    await reauthenticateGoogleAccount(user);
+  } else {
+    throw new Error('Kontopasswort erforderlich.');
+  }
   const uid = user.uid;
 
   if (import.meta.env.VITE_DELETE_ACCOUNT_BACKEND === 'functions') {

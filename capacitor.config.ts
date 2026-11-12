@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   android: { allowMixedContent: false },
   plugins: {
+    FirebaseAuthentication: { skipNativeAuth: true, providers: ['google.com'] },
     CapacitorUpdater: {
       // No vendor network calls or silent code replacement.
       // Parola verifies its own signed Firebase-hosted manifest.

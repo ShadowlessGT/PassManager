@@ -11,6 +11,9 @@ project(':aparajita-capacitor-secure-storage').projectDir = new File('../node_mo
 include ':capacitor-firebase-app-check'
 project(':capacitor-firebase-app-check').projectDir = new File('../node_modules/@capacitor-firebase/app-check/android')
 
+include ':capacitor-firebase-authentication'
+project(':capacitor-firebase-authentication').projectDir = new File('../node_modules/@capacitor-firebase/authentication/android')
+
 include ':capacitor-mlkit-text-recognition'
 project(':capacitor-mlkit-text-recognition').projectDir = new File('../node_modules/@capacitor-mlkit/text-recognition/android')
 
