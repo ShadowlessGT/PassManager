@@ -4,7 +4,7 @@
 
 ## Deutsch
 
-**Name:** Parola – Passwortmanager
+**Name:** Passwort Manager: Parola
 
 **Kurzbeschreibung:**
 Passwörter verschlüsselt aufbewahren, Logins gezielt einfüllen und neue Zugänge nur mit Zustimmung speichern.
@@ -31,7 +31,7 @@ Auch ein verschlüsselter Tresor bietet keine absolute Sicherheitsgarantie: Ein 
 
 ## English
 
-**Name:** Parola – Password Manager
+**Name:** Password Manager: Parola
 
 **Short description:**
 Keep passwords encrypted, fill logins on request, and save new credentials only with your approval.

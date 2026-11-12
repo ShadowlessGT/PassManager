@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Passwort Manager: Parola",
+    "description": "Offizieller deutscher Produktname"
+  },
+  "extensionDescription": {
+    "message": "Verschlüsselter Passwortmanager: Logins mit Zustimmung speichern und auf HTTPS-Webseiten ausfüllen.",
+    "description": "Kurzbeschreibung des Add-ons"
+  }
+}

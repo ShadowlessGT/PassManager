@@ -58,7 +58,14 @@ for (const target of ['chrome', 'firefox']) {
     copyFileSync(file, join(directory, name));
   }
   const manifest = JSON.parse(readFileSync(join(source, 'manifest.' + target + '.json'), 'utf8'));
-
+  const locales = ['de', 'en'];
+  for (const locale of locales) {
+    const sourceLocale = join(source, '_locales', locale, 'messages.json');
+    const outLocale = join(directory, '_locales', locale);
+    if (!existsSync(sourceLocale)) throw new Error('Translation catalog missing: ' + locale);
+    mkdirSync(outLocale, { recursive: true });
+    copyFileSync(sourceLocale, join(outLocale, 'messages.json'));
+  }
   const iconFiles = ['icon16.png', 'icon48.png', 'icon128.png'];
   mkdirSync(join(directory, 'icons'), { recursive: true });
   for (const name of iconFiles) {
@@ -77,6 +84,9 @@ for (const target of ['chrome', 'firefox']) {
   const zip = new ZipFile();
   for (const [name] of copies) zip.addFile(join(directory, name), name);
   for (const name of iconFiles) zip.addFile(join(directory, 'icons', name), 'icons/' + name);
+  for (const locale of locales) {
+    zip.addFile(join(directory, '_locales', locale, 'messages.json'), '_locales/' + locale + '/messages.json');
+  }
   for (const name of ['manifest.json', 'config.mjs']) zip.addFile(join(directory, name), name);
   const archivePath = join(output, 'parola-' + target + '-dev-' + manifest.version + '.zip');
   const file = createWriteStream(archivePath);

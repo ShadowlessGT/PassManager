@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Parola – Passwort-Tresor",
-  "description": "Verschlüsselter Parola-Tresor: Logins per Zustimmung speichern und auf HTTPS-Seiten einfüllen.",
-  "version": "0.3.0",
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "0.3.1",
   "permissions": [
     "activeTab",
     "scripting",
@@ -36,5 +36,6 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "default_locale": "en"
 }
