@@ -36,3 +36,5 @@ Never run GitHub Actions. Never push secrets or include passwords in shell logs.
 - `PAROLA_PLAY_OPEN_TEST_FREIGEBEN.cmd` – nur **nach realem Android-/Google-Login-Test**: vorhandenes Bundle dem offenen Test zuweisen. Keine Produktion.
 
 Nach bestätigter Geräte-QA lässt sich Upload **und** offener Test über `Build-Sign-Upload-Parola.ps1 -Upload -PublishOpenTest -QaApproved` in einem Ablauf durchführen. Neue Releases brauchen einen höheren Gradle `versionCode`.
+
+- `PAROLA_PLAY_INTERN_TEST_FREIGEBEN.cmd` – bereits hochgeladenes AAB in den **internen** Google-Play-Test übernehmen. Offener Test und Produktion bleiben unverändert.
