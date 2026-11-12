@@ -465,3 +465,8 @@ android/gradle-local.err
 /desktop/src-tauri/target/
 /desktop/src-tauri/gen/
 /desktop/src-tauri/.tauri/
+
+/tools/play-release/out/
+/tools/play-release/*signing.local.env
+
+/tools/play-release/__pycache__/
