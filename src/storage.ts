@@ -41,6 +41,43 @@ export async function writeLocalVault(envelope: EncryptedEnvelope): Promise<void
   await transaction('readwrite', store => store.put(envelope, KEY));
 }
 
+/** Atomic master-password rotation: remove all older password-derived local
+ * ciphertext copies. Never leave an old recovery copy accessible with old key.
+ */
+export async function replaceVaultAfterPasswordChange(envelope: EncryptedEnvelope): Promise<void> {
+  const db = await connect();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      store.put(envelope, KEY);
+      store.delete(PRE_RESTORE_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('Passwortwechsel konnte nicht gespeichert werden.'));
+      tx.onabort = () => reject(tx.error ?? new Error('Passwortwechsel abgebrochen.'));
+    });
+  } finally { db.close(); }
+}
+
+/** Local-only emergency deletion. Cloud backups are never touched. This cannot
+ * securely erase physical flash blocks or remote/device backups.
+ */
+export async function clearLocalVault(): Promise<void> {
+  const db = await connect();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      store.delete(KEY);
+      store.delete(PRE_RESTORE_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('Lokaler Tresor konnte nicht gelöscht werden.'));
+      tx.onabort = () => reject(tx.error ?? new Error('Löschvorgang abgebrochen.'));
+    });
+  } finally { db.close(); }
+}
+
+
 const PRE_RESTORE_KEY = 'previous-before-cloud-restore';
 
 /** A recovery copy is always encrypted and stays only on this device. */

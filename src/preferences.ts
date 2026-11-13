@@ -1,5 +1,6 @@
 import type { LanguagePreference } from './i18n';
 import { normalizeLanguagePreference } from './i18n';
+
 export type UiMode = 'simple' | 'expert';
 export type Appearance = 'system' | 'light' | 'dark';
 export type TextSize = 'normal' | 'large' | 'extra-large';
@@ -10,26 +11,46 @@ export type UserPreferences = {
   textSize: TextSize;
   backgroundLockMs: number;
   idleLockMs: number;
+  clipboardClearMs: number;
+  screenOffLock: boolean;
+  screenshotsAllowed: boolean;
+  selfDestructEnabled: boolean;
+  selfDestructMaxAttempts: number;
+  showRemainingAttempts: boolean;
 };
 
 export const LOCK_OPTIONS = [
   { value: 0, label: 'Sofort' },
   { value: 60_000, label: '1 Minute' },
+  { value: 2 * 60_000, label: '2 Minuten' },
   { value: 5 * 60_000, label: '5 Minuten' },
   { value: 10 * 60_000, label: '10 Minuten' },
   { value: 15 * 60_000, label: '15 Minuten' },
   { value: 30 * 60_000, label: '30 Minuten' },
   { value: 60 * 60_000, label: '1 Stunde' }
 ] as const;
+export const IDLE_OPTIONS = LOCK_OPTIONS.filter(option => option.value !== 0);
+export const CLIPBOARD_OPTIONS = [
+  { value: 0, label: 'Nicht automatisch' },
+  { value: 30_000, label: '30 Sekunden' },
+  { value: 60_000, label: '1 Minute' },
+  { value: 2 * 60_000, label: '2 Minuten' },
+  { value: 5 * 60_000, label: '5 Minuten' }
+] as const;
 
-export const IDLE_OPTIONS = LOCK_OPTIONS.filter(item => item.value !== 0);
 export const DEFAULT_PREFERENCES: UserPreferences = {
   mode: 'simple',
   appearance: 'system',
   language: 'system',
   textSize: 'large',
-  backgroundLockMs: 5 * 60_000,
-  idleLockMs: 15 * 60_000
+  backgroundLockMs: 2 * 60_000,
+  idleLockMs: 2 * 60_000,
+  clipboardClearMs: 2 * 60_000,
+  screenOffLock: true,
+  screenshotsAllowed: false,
+  selfDestructEnabled: false,
+  selfDestructMaxAttempts: 10,
+  showRemainingAttempts: false
 };
 const PREFERENCE_KEY = 'passmanager.ui-preferences-v1';
 
@@ -38,25 +59,32 @@ export function normalizePreferences(raw: unknown): UserPreferences {
   const source = raw as Partial<UserPreferences>;
   const validBackground = LOCK_OPTIONS.some(option => option.value === source.backgroundLockMs);
   const validIdle = IDLE_OPTIONS.some(option => option.value === source.idleLockMs);
+  const validClipboard = CLIPBOARD_OPTIONS.some(option => option.value === source.clipboardClearMs);
   return {
     mode: source.mode === 'expert' ? 'expert' : 'simple',
     appearance: source.appearance === 'light' || source.appearance === 'dark' ? source.appearance : 'system',
     language: normalizeLanguagePreference(source.language),
     textSize: source.textSize === 'normal' || source.textSize === 'extra-large' ? source.textSize : 'large',
     backgroundLockMs: validBackground ? source.backgroundLockMs! : DEFAULT_PREFERENCES.backgroundLockMs,
-    idleLockMs: validIdle ? source.idleLockMs! : DEFAULT_PREFERENCES.idleLockMs
+    idleLockMs: validIdle ? source.idleLockMs! : DEFAULT_PREFERENCES.idleLockMs,
+    clipboardClearMs: validClipboard ? source.clipboardClearMs! : DEFAULT_PREFERENCES.clipboardClearMs,
+    screenOffLock: source.screenOffLock !== false,
+    screenshotsAllowed: source.screenshotsAllowed === true,
+    selfDestructEnabled: source.selfDestructEnabled === true,
+    selfDestructMaxAttempts: [5, 10, 15, 20].includes(source.selfDestructMaxAttempts ?? 0)
+      ? source.selfDestructMaxAttempts! : DEFAULT_PREFERENCES.selfDestructMaxAttempts,
+    showRemainingAttempts: source.showRemainingAttempts === true
   };
 }
 export function loadPreferences(): UserPreferences {
-  try {
-    return normalizePreferences(JSON.parse(window.localStorage.getItem(PREFERENCE_KEY) || 'null'));
-  } catch { return { ...DEFAULT_PREFERENCES }; }
+  try { return normalizePreferences(JSON.parse(window.localStorage.getItem(PREFERENCE_KEY) || 'null')); }
+  catch { return { ...DEFAULT_PREFERENCES }; }
 }
 export function savePreferences(preferences: UserPreferences) {
   try {
-    // No secret values, keys or plaintext vault data are ever stored here.
+    // UI settings only, never keys, plaintext vault data or passwords.
     window.localStorage.setItem(PREFERENCE_KEY, JSON.stringify(normalizePreferences(preferences)));
-  } catch { /* Still usable if WebView storage is disabled */ }
+  } catch { /* WebView storage may be unavailable */ }
 }
 export function shouldLockAfterBackground(start: number | null, now: number, durationMs: number): boolean {
   if (start === null) return false;

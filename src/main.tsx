@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { preparePrivacyScreen } from './device';
 import './styles.css';
+import './migrationSecurity.css';
 import './ota.css';
 import { loadPreferences } from './preferences';
 import { applyLanguage } from './i18n';
@@ -15,7 +16,7 @@ applyLanguage(startupPreferences.language);
 const startAppearance = startupPreferences.appearance;
 applyResolvedAppearance(resolveAppearance(startAppearance, window.matchMedia('(prefers-color-scheme: dark)').matches));
 
-void preparePrivacyScreen().catch(() => {
+void preparePrivacyScreen(startupPreferences.screenshotsAllowed).catch(() => {
   // Do not display potentially sensitive vault data if native screenshot protection fails.
   if (import.meta.env.PROD) document.documentElement.classList.add('privacy-guard-failed');
 });

@@ -10,6 +10,13 @@ import {
 import { newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
 import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
+import BackupPanel from './BackupPanel';
+import SecurityOptions from './SecurityOptions';
+import ChangeMasterPanel from './ChangeMasterPanel';
+import { skipDuplicates } from './importer';
+import { exportEncryptedBackup, exportVaultCsv, newBackupFilename } from './vaultTransfer';
+import { saveUserExport } from './fileExport';
+import { failedUnlocks, registerFailedUnlock, resetFailedUnlocks, shouldSelfDestruct } from './securityAttempts';
 import LicensePanel from './LicensePanel';
 import { lookupLicense } from './license';
 import { checkPlayLicenseServer } from './playBilling';
@@ -35,8 +42,8 @@ import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
 import type { EncryptedEnvelope } from './crypto';
 import { verifyCloudVault, vaultRevision } from './cloudSafety';
-import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
-import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
+import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault, replaceVaultAfterPasswordChange, clearLocalVault } from './storage';
+import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice, setScreenshotProtection } from './device';
 import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignInWithGoogle, cloudHasGoogleProvider, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 import { googleSignInErrorText } from './googleAuthError';
 
@@ -287,6 +294,9 @@ export default function App() {
   const [previousBackupAvailable, setPreviousBackupAvailable] = useState(false);
   const [showAdvancedSecurity, setShowAdvancedSecurity] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
+  const [showBackupPanel, setShowBackupPanel] = useState(false);
+  const [showMasterChange, setShowMasterChange] = useState(false);
+  const [failedCount, setFailedCount] = useState(failedUnlocks);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
@@ -295,7 +305,45 @@ export default function App() {
   const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
+  const pendingClipboard = useRef<{ value: string; expiresAt: number; timer: number } | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => {
+    let active = true;
+    void setScreenshotProtection(preferences.screenshotsAllowed).catch(() => {
+      if (active) {
+        document.documentElement.classList.add('privacy-guard-failed');
+        setNotice('Android-Bildschirmschutz konnte nicht angewendet werden.');
+      }
+    });
+    return () => { active = false; };
+  }, [preferences.screenshotsAllowed]);
+
+  useEffect(() => {
+    const screenOff = () => { if (preferences.screenOffLock) lockVault(); };
+    window.addEventListener('parola-screen-off', screenOff);
+    return () => window.removeEventListener('parola-screen-off', screenOff);
+  }, [preferences.screenOffLock]);
+
+  async function clearCopiedValueWhenDue() {
+    const pending = pendingClipboard.current;
+    if (!pending || Date.now() < pending.expiresAt) return;
+    pendingClipboard.current = null;
+    window.clearTimeout(pending.timer);
+    try {
+      const content = await Clipboard.read();
+      if (content.value === pending.value) await Clipboard.write({ string: '' });
+    } catch { /* Device may block background clipboard reads. */ }
+  }
+  useEffect(() => {
+    if (!preferences.clipboardClearMs) {
+      const pending = pendingClipboard.current;
+      if (pending) window.clearTimeout(pending.timer);
+      pendingClipboard.current = null;
+    }
+    const onForeground = () => { if (!document.hidden) void clearCopiedValueWhenDue(); };
+    document.addEventListener('visibilitychange', onForeground);
+    return () => document.removeEventListener('visibilitychange', onForeground);
+  }, [preferences.clipboardClearMs]);
   useEffect(() => {
     const synchronize = () => applyLanguage(preferences.language);
     synchronize();
@@ -366,6 +414,7 @@ export default function App() {
     hiddenSince.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
     setShowOCR(false); setShowQuickAdd(false);
+    setShowBackupPanel(false); setShowMasterChange(false);
     setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
   }
@@ -429,8 +478,41 @@ export default function App() {
       if (hasVault && !stored) throw new Error('Tresordatei wurde nicht gefunden.');
       const vaultSalt = stored?.salt ?? newSalt();
       const derived = await deriveVaultKey(master, vaultSalt);
-      const clear = stored ? await decryptVault(stored, derived) : newVault();
+      let clear: VaultData;
+      if (stored) {
+        try {
+          clear = await decryptVault(stored, derived);
+        } catch (reason) {
+          // Count only AES-GCM authentication failures, never storage outages
+          // or invalid data types. A damaged vault can produce the same error.
+          // Hence the destructive option is opt-in, with backup warnings.
+          if (preferences.selfDestructEnabled && reason instanceof DOMException &&
+              reason.name === 'OperationError') {
+            const attempts = registerFailedUnlock();
+            setFailedCount(attempts);
+            if (shouldSelfDestruct(true, preferences.selfDestructMaxAttempts, attempts)) {
+              await writes.current; // No earlier in-flight write may recreate a deleted vault.
+              await clearLocalVault();
+              try { await disableDeviceUnlock(); } catch { /* obsolete device key cannot decrypt a deleted vault */ }
+              resetFailedUnlocks();
+              setFailedCount(0);
+              setDeviceEnabled(false);
+              setHasVault(false);
+              setGateError('Nach zu vielen fehlgeschlagenen Versuchen wurde der lokale Tresor gelöscht. Eine vorhandene Cloud- oder Dateisicherung bleibt erhalten.');
+              return;
+            }
+            if (preferences.showRemainingAttempts) {
+              setGateError('Entsperren fehlgeschlagen. Noch ' +
+                Math.max(0, preferences.selfDestructMaxAttempts - attempts) + ' Versuche bis zur lokalen Löschung.');
+              return;
+            }
+          }
+          throw reason;
+        }
+      } else clear = newVault();
       if (!stored) await writeLocalVault(await encryptVault(clear, derived, vaultSalt));
+      resetFailedUnlocks();
+      setFailedCount(0);
       hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(vaultSalt); setData(clear); setHasVault(true);
@@ -447,6 +529,8 @@ export default function App() {
       if (!stored) throw new Error('Kein Tresor vorhanden.');
       const derived = await unlockWithDevice();
       const clear = await decryptVault(stored, derived);
+      resetFailedUnlocks();
+      setFailedCount(0);
       hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(stored.salt); setData(clear); lastActivity.current = Date.now();
@@ -533,18 +617,101 @@ export default function App() {
   async function copyValue(value: string, label: string, entryId?: string, fieldType?: string) {
     try {
       await Clipboard.write({ string: value });
+      const previous = pendingClipboard.current;
+      if (previous) window.clearTimeout(previous.timer);
+      pendingClipboard.current = null;
+      if (preferences.clipboardClearMs > 0) {
+        const expiresAt = Date.now() + preferences.clipboardClearMs;
+        const timer = window.setTimeout(() => void clearCopiedValueWhenDue(), preferences.clipboardClearMs);
+        pendingClipboard.current = { value, expiresAt, timer };
+      }
       setNotice(label + ' kopiert');
       if (entryId) void recordActivity(entryId, 'copy', fieldType ?? label);
-    } catch { setNotice('Kopieren nicht möglich – Clipboard-Berechtigung prüfen'); }
-  }
-
-  async function clearHistory(entryId: string) {
+    } catch { setNotice('Kopieren nicht möglich - Clipboard-Berechtigung prüfen'); }
+  }  async function clearHistory(entryId: string) {
     try {
       await mutateVault(current => ({ ...current, entries: current.entries.map(entry =>
         entry.id === entryId ? { ...entry, passwordHistory: [] } : entry
       ) }));
       setNotice('Passwort-Historie gelöscht');
     } catch { setNotice('Historie konnte nicht gelöscht werden'); }
+  }
+
+  async function exportVault(format: 'encrypted' | 'csv') {
+    if (!key || !dataRef.current) throw new Error('Bitte zuerst den Tresor entsperren.');
+    if (format === 'csv' && !window.confirm(
+      'ACHTUNG: CSV enthält Passwörter, PINs und weitere vertrauliche Angaben als Klartext. Die ausgewählte Datei ist NICHT verschlüsselt. Wirklich exportieren?'
+    )) return;
+    await writes.current;
+    const latest = dataRef.current;
+    if (!latest) throw new Error('Der Tresor wurde inzwischen gesperrt.');
+    if (format === 'encrypted') {
+      const encrypted = await readLocalVault();
+      if (!encrypted) throw new Error('Keine verschlüsselte Sicherung vorhanden.');
+      await saveUserExport(newBackupFilename('parola'), 'application/json', exportEncryptedBackup(encrypted));
+      setNotice('Verschlüsseltes Parola-Backup exportiert');
+    } else {
+      await saveUserExport(newBackupFilename('csv'), 'text/csv', exportVaultCsv(latest));
+      setNotice('CSV-Klartextdatei erstellt – bitte geschützt aufbewahren');
+    }
+  }
+
+  async function importEncryptedVault(incoming: VaultData) {
+    let imported = 0;
+    await mutateVault(current => {
+      const { fresh } = skipDuplicates(current.entries, incoming.entries);
+      imported = fresh.length;
+      const cloned = fresh.map(entry => ({
+        ...entry,
+        id: crypto.randomUUID(),
+        fields: (entry.fields ?? []).map(field => ({ ...field, id: crypto.randomUUID() })),
+        categories: [...entry.categories],
+        images: [...entry.images]
+      }));
+      const knownCategories = categoriesForVault(current);
+      const names = new Set(knownCategories.map(category => category.name.toLocaleLowerCase('de')));
+      for (const category of incoming.categories ?? []) {
+        if (!category || typeof category.name !== 'string') continue;
+        const name = category.name.trim();
+        if (!name || name.length > 70 || names.has(name.toLocaleLowerCase('de'))) continue;
+        knownCategories.push({ ...category, id: crypto.randomUUID() });
+        names.add(name.toLocaleLowerCase('de'));
+      }
+      let merged: VaultData = {
+        ...current,
+        entries: [...cloned, ...current.entries],
+        categories: knownCategories
+      };
+      for (const entry of cloned) merged = ensureEntryCategories(merged, entry);
+      return merged;
+    });
+    setNotice(imported + ' Einträge aus verschlüsseltem Backup importiert');
+  }
+
+  async function changeMasterPassword(previous: string, next: string) {
+    if (!key || !dataRef.current) throw new Error('Tresor gesperrt.');
+    await writes.current;
+    const encrypted = await readLocalVault();
+    if (!encrypted) throw new Error('Kein Tresor vorhanden.');
+    const previousKey = await deriveVaultKey(previous, encrypted.salt);
+    // Only the correct current master password may rotate the key.
+    const clear = await decryptVault(encrypted, previousKey);
+    const newVaultSalt = newSalt();
+    const nextKey = await deriveVaultKey(next, newVaultSalt);
+    const replacement = await encryptVault(clear, nextKey, newVaultSalt);
+    await replaceVaultAfterPasswordChange(replacement);
+    // Current UI is now bound to the new key, even if removing an obsolete
+    // biometric key fails afterward.
+    dataRef.current = clear;
+    setKey(nextKey);
+    setSalt(newVaultSalt);
+    setPreviousBackupAvailable(false); // Old password-derived recovery copy was purged.
+    try { await disableDeviceUnlock(); }
+    catch { /* Old biometric key cannot unlock the new encrypted envelope. */ }
+    setDeviceEnabled(false);
+    resetFailedUnlocks();
+    setFailedCount(0);
+    setNotice('Master-Passwort geändert. Biometrie erneut aktivieren und Sicherung aktualisieren.');
   }
 
   async function toggleDevice() {
@@ -719,6 +886,9 @@ export default function App() {
             </label>
           </>}
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
+          {hasVault && preferences.selfDestructEnabled && preferences.showRemainingAttempts && <p className="master-warning" role="status">
+            Noch {Math.max(0, preferences.selfDestructMaxAttempts - failedCount)} Versuche bis zur Löschung des lokalen Tresors.
+          </p>}
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? t('auth.unlock') : t('auth.create')} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
         {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> {l('biometricOpen')}</button>}
@@ -891,6 +1061,22 @@ export default function App() {
               <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}><ArrowDownToLine size={17}/> Import-Assistent öffnen</button>
             </section>
             </>}
+            {simple && <section className="settings-card">
+              <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span>
+                <div><h2>Passwörter aus anderer App importieren</h2>
+                  <p>Google Passwortmanager, Password Safe, Bitwarden, KeePass, 1Password und viele weitere per CSV / Excel.</p></div></div>
+              <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}>
+                <ArrowDownToLine size={17}/> Import-Assistent öffnen
+              </button>
+            </section>}
+            <section className="settings-card">
+              <div className="settings-heading"><span className="settings-icon"><ShieldCheck size={22}/></span>
+                <div><h2>Import, Export und Wiederherstellung</h2>
+                  <p>Ein vollständiges verschlüsseltes .parola-Backup erstellen, importieren oder eine CSV für andere Apps exportieren.</p></div></div>
+              <button className="primary-btn" type="button" onClick={() => setShowBackupPanel(true)}>
+                <ArrowUpToLine size={17}/> Backup und Export öffnen
+              </button>
+            </section>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
               <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
@@ -913,6 +1099,13 @@ export default function App() {
               </div>}
               <button className="outline-btn" type="button" onClick={lockVault}><LogOut size={17}/> Tresor jetzt sperren</button>
             </section>
+
+            <SecurityOptions preferences={preferences} onChange={next => {
+              if (next.selfDestructEnabled !== preferences.selfDestructEnabled) { resetFailedUnlocks(); setFailedCount(0); }
+              setPreferences(next);
+            }}
+              onChangeMaster={() => setShowMasterChange(true)}
+              onBackup={() => setShowBackupPanel(true)}/>
 
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon cloud"><Cloud size={22}/></span><div><h2>{simple ? 'Meine Passwörter sichern' : 'Firebase Cloud-Backup'}</h2><p>{simple ? 'Freiwillige Sicherung für einen späteren Handywechsel.' : 'Optional – nur verschlüsselte Tresordaten werden übertragen.'}</p></div></div>
@@ -1005,9 +1198,16 @@ export default function App() {
       </div>}
 
       {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async incoming => {
-        await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
+        await mutateVault(current => {
+          let merged: VaultData = { ...current, entries: [...incoming, ...current.entries] };
+          for (const entry of incoming) merged = ensureEntryCategories(merged, entry);
+          return merged;
+        });
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
+      {showBackupPanel && <BackupPanel existing={entries} onClose={() => setShowBackupPanel(false)}
+        onExport={exportVault} onImportVault={importEncryptedVault}/>}
+      {showMasterChange && <ChangeMasterPanel onClose={() => setShowMasterChange(false)} onChange={changeMasterPassword}/>}
       {restoreCandidate && <div className="overlay" role="presentation">
         <section className="sheet cloud-restore-sheet" role="dialog" aria-modal="true" aria-label="Cloud-Sicherung prüfen">
           <header className="sheet-header"><ShieldCheck size={21}/><h2>Sicherung sicher wiederherstellen</h2>
