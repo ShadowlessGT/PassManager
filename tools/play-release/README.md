@@ -3,7 +3,7 @@
 Repository: `N:\Shadowless Studios\Apps\PassManager`
 
 - Upload package: `com.shadowlessstudios.passwordmanager`
-- Android release: Gradle `android/app/build.gradle` (`versionCode 20` / `0.7.3` initially)
+- Android release: Gradle `android/app/build.gradle` (`versionCode 21` / `0.7.4` at Google sign-in fix)
 - Signing keystore: `G:\Meine Ablage\Keystore für Google publishing\ShadowlessStudios.keystore`
 - Alias: `parola`; expected Play upload certificate SHA-1: `541D17691DE2793AB4370B829B014B9A73AF8506`
 - DPAPI credential: `%LOCALAPPDATA%\ShadowlessPlayAutomation\parola-signing.dpapi.json`
@@ -38,3 +38,11 @@ Never run GitHub Actions. Never push secrets or include passwords in shell logs.
 Nach bestätigter Geräte-QA lässt sich Upload **und** offener Test über `Build-Sign-Upload-Parola.ps1 -Upload -PublishOpenTest -QaApproved` in einem Ablauf durchführen. Neue Releases brauchen einen höheren Gradle `versionCode`.
 
 - `PAROLA_PLAY_INTERN_TEST_FREIGEBEN.cmd` – bereits hochgeladenes AAB in den **internen** Google-Play-Test übernehmen. Offener Test und Produktion bleiben unverändert.
+
+## Firebase Google Sign-In: Play-installed APK certificate
+
+The upload signing SHA-1 (`54:1D:...:85:06`) is **not** the same as the Google Play app-signing SHA-1 (`61:EE:9C:B4:BC:F8:CF:3C:A7:D6:48:C7:E3:11:1D:69:59:C2:69:8F`). The latter was extracted and independently verified from Google Play's actual generated signed APK for versionCode 20. Both SHA-1 fingerprints are registered in Firebase project `password-manager-parola`. Both SHA-256 fingerprints were also verified.
+
+Every build now refreshes `android/app/google-services.json` using `Refresh-Parola-Firebase-Config.py` and fails closed if either Android OAuth client is absent. `Check-Parola-Google-Firebase.py` then checks Firebase's registered SHA-1/SHA-256 fingerprints and the active Google Sign-In provider before the app can be built or uploaded. The config file remains locally ignored by Git; no private account keys or passwords are committed.
+
+**0.7.4 / versionCode 21** was built, signed, uploaded and released to **internal testing**. The open testing track remains at **0.7.3 / versionCode 20** until a tester confirms native Google sign-in, encrypted vault continuity, and account deletion on a Play-installed Android device. The new error diagnostics expose safe error codes without leaking OAuth tokens. A successful build or Firebase preflight is not a substitute for real-device QA.

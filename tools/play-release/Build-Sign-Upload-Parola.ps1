@@ -18,6 +18,12 @@ $signer = Join-Path $PSScriptRoot 'Sign-Parola-AAB.ps1'
 $openTest = Join-Path $PSScriptRoot 'Release-Parola-Open-Test.py'
 $gradle = Join-Path $root 'android\gradlew.bat'
 if (!(Test-Path -LiteralPath $gradle)) { throw 'Android Gradle wrapper missing.' }
+Write-Output 'PAROLA: refresh Firebase Android Google OAuth configuration'
+& python (Join-Path $PSScriptRoot 'Refresh-Parola-Firebase-Config.py')
+if ($LASTEXITCODE -ne 0) { throw 'PAROLA Firebase SDK config refresh failed. No bundle built or uploaded.' }
+# Fail closed if Google Play/Firebase certificate registration or Google provider are broken.
+& python (Join-Path $PSScriptRoot 'Check-Parola-Google-Firebase.py')
+if ($LASTEXITCODE -ne 0) { throw 'PAROLA Google/Firebase auth preflight failed. No bundle uploaded.' }
 if ($CheckOnly) {
   & python $uploader --check
   if ($LASTEXITCODE -ne 0) { throw 'Google Play preflight failed.' }

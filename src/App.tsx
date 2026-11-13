@@ -38,6 +38,7 @@ import { verifyCloudVault, vaultRevision } from './cloudSafety';
 import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
 import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
 import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignInWithGoogle, cloudHasGoogleProvider, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
+import { googleSignInErrorText } from './googleAuthError';
 
 type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
@@ -571,8 +572,8 @@ export default function App() {
       setCloudLoginPassword('');
       setCloudUser(cloudEmail());
       setNotice('Google-Konto verbunden. Dein lokaler Tresor bleibt verschlüsselt.');
-    } catch {
-      setCloudError('Google-Anmeldung fehlgeschlagen oder abgebrochen. Bitte Firebase Google-Anmeldung und Android-Zertifikat prüfen.');
+    } catch (error) {
+      setCloudError(googleSignInErrorText(error));
     } finally {
       setCloudBusy(false);
     }
@@ -950,7 +951,7 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Passwort Manager: Parola v0.7.3 · Shadowless Studios · Offline-first</p>
+            <p className="version-line">Passwort Manager: Parola v0.7.4 · Shadowless Studios · Offline-first</p>
           </div>}
         </main>
       </div>
