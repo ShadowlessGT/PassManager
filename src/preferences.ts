@@ -1,5 +1,6 @@
 import type { LanguagePreference } from './i18n';
 import { normalizeLanguagePreference } from './i18n';
+import { SNAPSHOT_INTERVALS } from './snapshotPolicy';
 
 export type UiMode = 'simple' | 'expert';
 export type Appearance = 'system' | 'light' | 'dark';
@@ -17,6 +18,14 @@ export type UserPreferences = {
   selfDestructEnabled: boolean;
   selfDestructMaxAttempts: number;
   showRemainingAttempts: boolean;
+  autoSnapshotEnabled: boolean;
+  autoSnapshotIntervalMs: number;
+  autoSnapshotRetention: number;
+  accentColor: 'blue'|'teal'|'violet';
+  highContrast: boolean;
+  websiteIconsEnabled: boolean;
+  copyButtonsVisible: boolean;
+  maskLength: boolean;
 };
 
 export const LOCK_OPTIONS = [
@@ -50,7 +59,15 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   screenshotsAllowed: false,
   selfDestructEnabled: false,
   selfDestructMaxAttempts: 10,
-  showRemainingAttempts: false
+  showRemainingAttempts: false,
+  autoSnapshotEnabled: false,
+  autoSnapshotIntervalMs: 24 * 60 * 60 * 1000,
+  autoSnapshotRetention: 10,
+  accentColor: 'blue',
+  highContrast: false,
+  websiteIconsEnabled: false,
+  copyButtonsVisible: true,
+  maskLength: false
 };
 const PREFERENCE_KEY = 'passmanager.ui-preferences-v1';
 
@@ -73,7 +90,18 @@ export function normalizePreferences(raw: unknown): UserPreferences {
     selfDestructEnabled: source.selfDestructEnabled === true,
     selfDestructMaxAttempts: [5, 10, 15, 20].includes(source.selfDestructMaxAttempts ?? 0)
       ? source.selfDestructMaxAttempts! : DEFAULT_PREFERENCES.selfDestructMaxAttempts,
-    showRemainingAttempts: source.showRemainingAttempts === true
+    showRemainingAttempts: source.showRemainingAttempts === true,
+    autoSnapshotEnabled: source.autoSnapshotEnabled === true,
+    autoSnapshotIntervalMs: SNAPSHOT_INTERVALS.some(option=>option.value===source.autoSnapshotIntervalMs)
+      ? source.autoSnapshotIntervalMs! : DEFAULT_PREFERENCES.autoSnapshotIntervalMs,
+    autoSnapshotRetention: Number.isInteger(source.autoSnapshotRetention) &&
+      source.autoSnapshotRetention! >= 1 && source.autoSnapshotRetention! <= 30
+      ? source.autoSnapshotRetention! : DEFAULT_PREFERENCES.autoSnapshotRetention,
+    accentColor: source.accentColor==='teal'||source.accentColor==='violet' ? source.accentColor : 'blue',
+    highContrast: source.highContrast===true,
+    websiteIconsEnabled: source.websiteIconsEnabled===true,
+    copyButtonsVisible: source.copyButtonsVisible!==false,
+    maskLength: source.maskLength===true
   };
 }
 export function loadPreferences(): UserPreferences {

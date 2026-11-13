@@ -3,6 +3,7 @@ package com.shadowlessstudios.passwordmanager;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Base64;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -32,6 +33,11 @@ public class ParolaDocumentExportPlugin extends Plugin {
             call.reject("Ungültiger Dateiname.");
             return;
         }
+        String encoding = call.getString("encoding", "utf8");
+        if (!"utf8".equals(encoding) && !"base64".equals(encoding)) {
+            call.reject("Exportformat unbekannt.");
+            return;
+        }
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(mime);
@@ -57,7 +63,11 @@ public class ParolaDocumentExportPlugin extends Plugin {
                 call.reject("Datei kann nicht geöffnet werden.");
                 return;
             }
-            out.write(content.getBytes(StandardCharsets.UTF_8));
+            if ("base64".equals(call.getString("encoding", "utf8"))) {
+                out.write(Base64.decode(content, Base64.DEFAULT));
+            } else {
+                out.write(content.getBytes(StandardCharsets.UTF_8));
+            }
             out.flush();
             JSObject response = new JSObject();
             response.put("uri", uri.toString());

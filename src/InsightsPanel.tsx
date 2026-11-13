@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart3, CalendarClock, Copy, Eye, Fingerprint, KeyRound, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
 import type { VaultData, VaultEntry } from './types';
 import { calculateInsights } from './insights';
+import { PasswordStatistics, SecurityOverview } from './PasswordStatistics';
 
 type Props = {
   data: VaultData;
@@ -28,14 +29,14 @@ function Stat({ name, amount, icon: Icon }: { name: string; amount: number; icon
 
 export default function InsightsPanel({ data, onOpen, onDeleteHistory }: Props) {
   const stats = useMemo(() => calculateInsights(data), [data]);
-  const [mode, setMode] = useState<'overview' | 'security' | 'history'>('overview');
-  const recentHistory = useMemo(() => data.entries.filter(e => (e.passwordHistory?.length ?? 0) > 0)
+  const [mode, setMode] = useState<'overview' | 'security' | 'statistics' | 'history'>('security');
+  const recentHistory = useMemo(() => data.entries.filter(e => !e.lifecycle && (e.passwordHistory?.length ?? 0) > 0)
     .sort((a, b) => (b.passwordHistory?.at(-1)?.replacedAt ?? 0) - (a.passwordHistory?.at(-1)?.replacedAt ?? 0)), [data]);
   const duplicateEntries = new Set(stats.security.reusedGroups.flatMap(g => g.entryIds));
-  const vulnerable = data.entries.filter(e => duplicateEntries.has(e.id));
+  const vulnerable = data.entries.filter(e => !e.lifecycle && duplicateEntries.has(e.id));
   return <div className="insights-layout">
     <div className="insight-tabs" role="tablist" aria-label="Statistiken">
-      {([{id:'overview',label:'Nutzung'}, {id:'security',label:'Sicherheit'}, {id:'history',label:'Historie'}] as const).map(t =>
+      {([{id:'overview',label:'Nutzung'}, {id:'security',label:'Sicherheit'}, {id:'statistics',label:'Statistik'}, {id:'history',label:'Historie'}] as const).map(t =>
         <button key={t.id} type="button" role="tab" aria-selected={mode === t.id} className={mode === t.id ? 'selected' : ''} onClick={() => setMode(t.id)}>{t.label}</button>)}
     </div>
     {mode === 'overview' && <>
@@ -54,7 +55,9 @@ export default function InsightsPanel({ data, onOpen, onDeleteHistory }: Props) 
       <Bars title="Meistverwendete Feldtypen" items={stats.fieldTypes}/>
       <Bars title="Am häufigsten kopierte Feldtypen" items={stats.copiedFields}/>
     </>}
+    {mode === 'statistics' && <PasswordStatistics vault={data} onOpen={onOpen}/>}
     {mode === 'security' && <>
+      <SecurityOverview vault={data} onOpen={onOpen}/>
       <div className="insights-grid">
         <Stat name="Eindeutige Passwörter" amount={stats.security.unique} icon={ShieldCheck}/>
         <Stat name="Mehrfach verwendete Einträge" amount={stats.security.reused} icon={AlertTriangle}/>

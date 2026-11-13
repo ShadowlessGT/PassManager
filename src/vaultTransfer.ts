@@ -123,7 +123,12 @@ export function validateImportedVault(vault: VaultData): VaultData {
           typeof field.value === 'string' && field.value.length <= 100_000))) ||
       typeof entry.createdAt !== 'number' || !Number.isFinite(entry.createdAt) ||
       typeof entry.updatedAt !== 'number' || !Number.isFinite(entry.updatedAt) ||
-      typeof entry.favorite !== 'boolean') {
+      typeof entry.favorite !== 'boolean' ||
+       (entry.tags !== undefined && (!Array.isArray(entry.tags) || entry.tags.length > 20 ||
+         !entry.tags.every(tag => typeof tag === 'string' && tag.length > 0 && tag.length <= 80))) ||
+       (entry.lifecycle !== undefined && (!entry.lifecycle || typeof entry.lifecycle !== 'object' ||
+         !['archived','trashed'].includes(entry.lifecycle.state) ||
+         typeof entry.lifecycle.changedAt !== 'number' || !Number.isFinite(entry.lifecycle.changedAt)))) {
       throw new Error('Das verschlüsselte Backup enthält ungültige oder zu große Einträge.');
     }
   }
@@ -131,7 +136,9 @@ export function validateImportedVault(vault: VaultData): VaultData {
     if (!category || typeof category.name !== 'string' ||
         category.name.trim().length === 0 || category.name.length > 70 ||
         typeof category.id !== 'string' || typeof category.color !== 'string' ||
-        typeof category.icon !== 'string') {
+        typeof category.icon !== 'string' ||
+         (category.parentId !== undefined && (typeof category.parentId !== 'string' ||
+           category.parentId.length > 160 || category.parentId === category.id))) {
       throw new Error('Die Sicherung enthält ungültige Kategorien.');
     }
   }

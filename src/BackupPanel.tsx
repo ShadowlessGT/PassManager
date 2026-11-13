@@ -10,7 +10,7 @@ import { skipDuplicates } from './importer';
 type Props = {
   existing: VaultEntry[];
   onClose: () => void;
-  onExport: (format: 'encrypted' | 'csv') => Promise<void>;
+  onExport: (format: 'encrypted' | 'csv' | 'xlsx') => Promise<void>;
   onImportVault: (vault: VaultData) => Promise<void>;
 };
 
@@ -67,11 +67,11 @@ export default function BackupPanel({ existing, onClose, onExport, onImportVault
     } finally { setBusy(false); }
   }
 
-  async function exportNow(format: 'encrypted' | 'csv') {
+  async function exportNow(format: 'encrypted' | 'csv' | 'xlsx') {
     setBusy(true); setError(''); setNotice('');
     try {
       await onExport(format);
-      setNotice(format === 'encrypted' ? 'Verschlüsseltes Backup gespeichert.' : 'CSV-Export erstellt.');
+      setNotice(format === 'encrypted' ? 'Verschlüsseltes Backup gespeichert.' : format === 'csv' ? 'CSV-Export erstellt.' : 'XLSX-Export erstellt.');
     } catch (e) {
       setError((e as Error).message || 'Export fehlgeschlagen.');
     } finally { setBusy(false); }
@@ -95,8 +95,11 @@ export default function BackupPanel({ existing, onClose, onExport, onImportVault
           <button className="secondary-btn" type="button" disabled={busy} onClick={() => void exportNow('csv')}>
             <ArrowUpToLine size={17}/> CSV für andere Passwortmanager
           </button>
+          <button className="secondary-btn" type="button" disabled={busy} onClick={() => void exportNow('xlsx')}>
+            <ArrowUpToLine size={17}/> Excel-Export (.xlsx)
+          </button>
         </div>
-        <p className="master-warning"><strong>CSV enthält Zugangsdaten im Klartext.</strong> Exportiere CSV nur bei Bedarf und speichere sie nicht in einem öffentlichen oder synchronisierten Ordner. Bilder und Passwortverläufe werden nur im verschlüsselten Backup vollständig übernommen.</p>
+        <p className="master-warning"><strong>CSV und XLSX enthalten Zugangsdaten im Klartext.</strong> Exportiere CSV nur bei Bedarf und speichere sie nicht in einem öffentlichen oder synchronisierten Ordner. Bilder und Passwortverläufe werden nur im verschlüsselten Backup vollständig übernommen.</p>
         <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={20}/></span><div><h3>Parola-Backup importieren</h3>
           <p>Eine eigene verschlüsselte Sicherung von einem anderen Gerät einlesen.</p></div></div>
         <label className="import-drop">Verschlüsselte .parola-Datei auswählen

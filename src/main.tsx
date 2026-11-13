@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { preparePrivacyScreen } from './device';
 import './styles.css';
 import './migrationSecurity.css';
+import './parolaFeatures.css';
 import './ota.css';
 import { loadPreferences } from './preferences';
 import { applyLanguage } from './i18n';

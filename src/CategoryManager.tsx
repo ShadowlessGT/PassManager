@@ -29,15 +29,24 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
   const [busy,setBusy]=useState(false);
   const [customize,setCustomize]=useState(false);
   const [error,setError]=useState('');
+  const [parentId,setParentId]=useState('');
+  const [layout,setLayout]=useState<'tiles'|'list'>(()=> {
+    try {return window.localStorage.getItem('parola.category-layout-v1') === 'list' ? 'list' : 'tiles';}
+    catch {return 'tiles';}
+  });
+  const setCategoryLayout=(next:'tiles'|'list')=>{
+    setLayout(next);
+    try {window.localStorage.setItem('parola.category-layout-v1',next);} catch { /* presentation only */ }
+  };
   function edit(category?:VaultCategory){
     setEditing(category ?? null);setNewCategory(!category);
     setCustomize(!simple);
     setName(category?.name??'');setColor(category?.color??CATEGORY_COLORS[0]);
-    setIcon(category?.icon??'folder');setError('');
+    setIcon(category?.icon??'folder');setParentId(category?.parentId??'');setError('');
   }
   async function save(event:FormEvent){
     event.preventDefault();setError('');setBusy(true);
-    try {await onSave({ ...makeCategory(name,icon,color),id:editing?.id??crypto.randomUUID() },editing?.id);
+    try {await onSave({ ...makeCategory(name,icon,color),id:editing?.id??crypto.randomUUID(),parentId:parentId||undefined },editing?.id);
       setEditing(null);setNewCategory(false);
     }catch(reason){setError((reason as Error).message||'Kategorie konnte nicht gespeichert werden.');}
     finally{setBusy(false);}
@@ -47,14 +56,18 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
       <div><h2>Meine Kategorien</h2><p>Ordne deine Einträge übersichtlich. Eine Kategorie ist kein eigener Passwort-Eintrag.</p></div>
       <button type="button" className="secondary-btn" onClick={()=>edit()}><Plus size={17}/> Kategorie erstellen</button>
     </div>
-    <div className="collection-grid">
+    <div className="category-layout-switch" role="group" aria-label="Kategorieansicht">
+      <button type="button" aria-pressed={layout==='tiles'} className={layout==='tiles'?'active':''} onClick={()=>setCategoryLayout('tiles')}>Kacheln</button>
+      <button type="button" aria-pressed={layout==='list'} className={layout==='list'?'active':''} onClick={()=>setCategoryLayout('list')}>Liste</button>
+    </div>
+    <div className={'collection-grid category-layout-'+layout}>
       {categories.length===0 && <div className="empty-state"><Folder size={32}/><h3>Keine Kategorien</h3><p>Erstelle einen Ordner – danach kannst du Einträge hinzufügen.</p></div>}
       {categories.map(category=>{
         const count=entries.filter(item=>item.categories.some(name=>name.toLocaleLowerCase('de')===category.name.toLocaleLowerCase('de'))).length;
-        return <div className="category-manager-card" key={category.id}>
+        return <div className="category-manager-card" key={category.id} style={{backgroundColor:layout==='tiles'?category.color+'25':undefined,borderColor:layout==='tiles'?category.color+'70':undefined}}>
           <button type="button" className="category-view-btn" onClick={()=>onOpen(category.name)} aria-label={'Kategorie '+category.name+' öffnen'}>
             <span className="category-large-icon" style={{backgroundColor:category.color+'30',color:category.color}}><CategoryIcon category={category}/></span>
-            <strong>{category.name}</strong><small>{count} {count===1?'Eintrag':'Einträge'}</small>
+            <strong>{category.name}</strong><small>{count} {count===1?'Eintrag':'Einträge'}{category.parentId ? ' · Unterordner von '+(categories.find(x=>x.id===category.parentId)?.name??'Unbekannt') : ''}</small>
           </button>
           <button type="button" className="category-edit-btn icon-btn" onClick={()=>edit(category)} aria-label={category.name+' bearbeiten'}><Pencil size={17}/></button>
         </div>;
@@ -66,7 +79,14 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
           <button type="button" className="icon-btn" aria-label="Schließen" onClick={()=>{setEditing(null);setNewCategory(false);}}><X size={19}/></button></header>
         <form className="editor-form" onSubmit={e=>void save(e)}>
           <label>Kategoriename<input autoFocus maxLength={70} placeholder="z. B. Zuhause" value={name} onChange={e=>setName(e.target.value)}/></label>
-          {simple && <button type="button" className="quick-optional-action" onClick={()=>setCustomize(previous=>!previous)}
+          <label>Übergeordneter Ordner (optional)
+            <select value={parentId} onChange={e=>setParentId(e.target.value)}>
+              <option value="">Kein übergeordneter Ordner</option>
+              {categories.filter(category=>category.id!==editing?.id).map(category=>
+                <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          {simple && <button type="button" className="quick-optional-action"  onClick={()=>setCustomize(previous=>!previous)}
             aria-expanded={customize}>{customize ? 'Weniger anzeigen' : 'Farbe und Symbol auswählen (freiwillig)'}</button>}
           {customize && <>
           <div className="field-label">Symbol wählen</div><div className="category-icons">
@@ -81,6 +101,9 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
               {color===value&&<span><Folder size={16}/></span>}
             </button>)}
           </div>
+          <label className="category-custom-color">Eigene Farbe auswählen
+            <input type="color" value={color} aria-label="Eigene Kategorienfarbe" onChange={e=>setColor(e.target.value)} />
+          </label>
           </>}
           {error&&<p className="error-box" role="alert">{error}</p>}
           <div className="sheet-actions">

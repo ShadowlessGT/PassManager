@@ -44,9 +44,12 @@ export type VaultEntry = {
   // Old passwords stay encrypted within the vault. Max 10 retained per entry.
   passwordHistory?: SecretHistoryItem[];
   keepPasswordHistory?: boolean;
+  lifecycle?: { state: 'archived' | 'trashed'; changedAt: number };
+  tags?: string[];
 };
 
 export type VaultCategory = {
+  parentId?: string;
   id: string;
   name: string;
   icon: string;
