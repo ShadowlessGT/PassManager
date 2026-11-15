@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Password Manager: Parola",
+    "description": "Official English product name"
+  },
+  "extensionDescription": {
+    "message": "Encrypted password manager: save logins with your consent and fill them on HTTPS websites.",
+    "description": "Browser store short description"
+  }
+}

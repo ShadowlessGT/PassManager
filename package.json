@@ -20,6 +20,8 @@
         "ota:publish": "python scripts/ota-hostinger-upload.py --publish",
         "ota:prepare": "python scripts/ota-hostinger-upload.py --prepare",
         "test:extension": "node --test extensions/tests/*.test.mjs",
+        "browser:oauth:check": "node scripts/browser-store-setup.mjs --status",
+        "browser:oauth:report": "node scripts/browser-store-setup.mjs --report",
         "extension:build": "node scripts/build-browser-extensions.mjs"
     },
     "dependencies": {

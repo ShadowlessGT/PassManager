@@ -58,3 +58,7 @@ Der Build übernimmt nur die öffentliche Firebase-Webkonfiguration aus der loka
 ## Store und Google Anmeldung
 
 Siehe [STORE_SUBMISSION.md](STORE_SUBMISSION.md). Eine Registrierung beim Chrome Web Store (einmalige Gebühr) und beim Firefox Add-ons Developer Hub ist unabhängig von Google Play erforderlich. Google OAuth-Clients müssen für jede Browser-Erweiterung eingerichtet werden. Der Store-Upload ist **noch nicht freigegeben**.
+
+## Browser OAuth Einmal-Einrichtung
+
+Siehe [Browser Google Store Setup](../docs/BROWSER_GOOGLE_STORE_SETUP_DE.md). Lokal: `npm run browser:oauth:report` oder PAROLA_GOOGLE_SETUP.cmd. Google Provider ist in Firebase bereits aktiv; Browser-Store-/OAuth-Clients sind noch offen.
