@@ -7,10 +7,7 @@ export function freeEntryEditError(previous: VaultEntry | undefined, next: Vault
       return 'Eigene Notizen, Beschreibungen und Personen benötigen Parola Ultra.';
     }
   }
-  const previousImages = previous?.images ?? [];
-  if ((next.images ?? []).some(image => !previousImages.includes(image))) {
-    return 'Neue Bildanhänge benötigen Parola Ultra.';
-  }
+  // Image attachments are part of PAROLA Free, including migrated originals.
   const oldFields = previous?.fields ?? [];
   if ((next.fields ?? []).some(field =>
     !oldFields.some(old => old.id === field.id &&

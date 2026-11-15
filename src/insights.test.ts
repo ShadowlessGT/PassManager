@@ -15,13 +15,13 @@ describe('local and private vault insights', () => {
     expect(snapshot.fieldTypes.some(f => f.name === 'PIN' && f.count === 1)).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain('same-secret-123!!');
   });
-  it('tracks field copy and opens, and retains latest 10 history items', () => {
+  it('tracks field copy and opens, and retains latest 50 history items', () => {
     let entry: VaultEntry = { ...blankEntry(), password:'an-old-password', keepPasswordHistory:true };
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 55; i++) {
       const next = { ...entry, password:'new-password-' + i };
       entry = trackPasswordHistory(entry, next);
     }
-    expect(entry.passwordHistory?.length).toBe(10);
+    expect(entry.passwordHistory?.length).toBe(50);
     entry = logActivity(entry, 'open', undefined, 100);
     entry = logActivity(entry, 'copy', 'PIN', 200);
     expect(entry.activity).toMatchObject({ opens:1, copies:1, lastOpenedAt:100, fieldCopies:{ PIN:1 } });

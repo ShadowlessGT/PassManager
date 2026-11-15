@@ -50,7 +50,7 @@ export function trackPasswordHistory(previous: VaultEntry | undefined, current: 
   return {
     ...current,
     passwordChangedAt: now,
-    passwordHistory: [...existing, { value: previous.password, replacedAt: now }].slice(-10)
+    passwordHistory: [...existing, { value: previous.password, replacedAt: now }].slice(-50)
   };
 }
 

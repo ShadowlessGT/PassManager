@@ -1,6 +1,8 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { blankEntry, makeField } from './types';
 import type { FieldKind, VaultEntry } from './types';
+import { mapPasswordSafeRelational } from './passwordSafeRelational';
+import type { PasswordSafeRelationalResult } from './passwordSafeRelational';
 
 type SqlcipherTable = {
   name: string;
@@ -9,7 +11,7 @@ type SqlcipherTable = {
   rows: Record<string,string>[];
 };
 
-export type EncryptedPasswordSafeResult = {
+export type EncryptedPasswordSafeResult = PasswordSafeRelationalResult | {
   format: string;
   tables: SqlcipherTable[];
   readRows: number;
@@ -18,6 +20,8 @@ export type EncryptedPasswordSafeResult = {
 
 type NativePasswordSafeImporter = {
   pickAndImport(options: { password: string }): Promise<EncryptedPasswordSafeResult>;
+  getImage(options: { session: string; imageId: string }): Promise<{ image: string }>;
+  finishImport(): Promise<void>;
 };
 
 const NativeImporter = registerPlugin<NativePasswordSafeImporter>('ParolaPasswordSafeDb');
@@ -36,6 +40,23 @@ export function openEncryptedPasswordSafe(password: string): Promise<EncryptedPa
   }
   if (!password || password.length > 4096) throw new Error('Bitte Master-Passwort der alten Datenbank eingeben.');
   return NativeImporter.pickAndImport({ password });
+}
+
+/** Fetch one original image only after the user confirms the preview.
+ * No base64 image is sent across the native bridge during initial discovery. */
+export async function loadPasswordSafeImage(session: string, imageId: string): Promise<string> {
+  if (!session || !/^[0-9]{1,18}$/.test(imageId)) throw new Error('Ungültige Bildreferenz.');
+  const { image } = await NativeImporter.getImage({ session, imageId });
+  if (typeof image !== 'string' || image.length > 7_000_000 ||
+      !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image)) {
+    throw new Error('Das Originalbild konnte nicht vollständig übernommen werden.');
+  }
+  return image;
+}
+
+/** Clear the encrypted temporary copy and the native SQLCipher session. */
+export async function finishPasswordSafeImport(): Promise<void> {
+  if (nativePasswordSafeSupported()) await NativeImporter.finishImport();
 }
 
 const normalized = (s: string) =>
@@ -82,6 +103,12 @@ export type PasswordSafeMapping = {
   sourceTables: string[];
   schema: Array<{ name: string; columns: string[]; rows: number }>;
   requiresPartialImportConfirmation: boolean;
+  sourceSession?: string;
+  imageRefsByEntryId?: Record<string, string[]>;
+  imageCount?: number;
+  sourceCategoryCount?: number;
+  sourceHistoryCount?: number;
+  sourceCategories?: Array<{ name: string; color: string }>;
 };
 
 /** Convert verified, decrypted SQLCipher rows into Parola's encrypted model.
@@ -89,6 +116,7 @@ export type PasswordSafeMapping = {
  * rather than silently presenting the conversion as complete.
  */
 export function mapPasswordSafeDatabase(result: EncryptedPasswordSafeResult): PasswordSafeMapping {
+  if (result && 'entries' in result) return mapPasswordSafeRelational(result);
   if (!result || typeof result.format !== 'string' ||
       !/^sqlcipher-v[234]$/.test(result.format) || !Array.isArray(result.tables)) {
     throw new Error('Nicht unterstütztes oder beschädigtes Datenbankformat.');

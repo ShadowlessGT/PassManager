@@ -133,12 +133,12 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
     const selected = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!selected.length) return;
-    if (selected.length + draft.images.length > 3) {
-      setError('Maximal 3 Bilder pro Eintrag.');
+    if (selected.length + draft.images.length > 12) {
+      setError('Maximal 12 Bilder pro Eintrag.');
       return;
     }
-    if (selected.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 500_000)) {
-      setError('Nur JPG, PNG oder WebP bis 500 KB pro Bild erlaubt.');
+    if (selected.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5_000_000)) {
+      setError('Nur JPG, PNG oder WebP bis 5 MB pro Bild erlaubt.');
       return;
     }
     try {
@@ -252,16 +252,16 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
                placeholder="z. B. Arbeit, Banking, Wichtig"/>
            </label>
            <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
-          {!simple && ultra && <>
-          <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>
+          {!simple && ultra && <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>}
+          <>
           <div className="form-section-title">Bilder und Anhänge</div>
-          <p className="input-help">Bilder werden zusammen mit dem gesamten Tresor verschlüsselt. Maximal 3 Bilder à 500 KB.</p>
+          <p className="input-help">Bilder werden mit dem Tresor verschlüsselt. Maximal 12 Bilder bis 5 MB pro Bild; große Bilder vergrößern Sicherungen.</p>
           <div className="image-gallery">
             {draft.images.map((src, index) => <div className="image-tile" key={index}><img src={src} alt={'Anhang ' + (index + 1)}/><button type="button" aria-label="Bild entfernen" onClick={() => update('images', draft.images.filter((_, i) => i !== index))}><X size={14}/></button></div>)}
-            {draft.images.length < 3 && <label className="image-picker"><ImagePlus size={25}/><span>Bild hinzufügen</span><input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={addImages}/></label>}
+            {draft.images.length < 12 && <label className="image-picker"><ImagePlus size={25}/><span>Bild hinzufügen</span><input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={addImages}/></label>}
           </div>
-          <label className="check-line"><input type="checkbox" checked={draft.favorite} onChange={e => update('favorite', e.target.checked)}/><span>Zu Favoriten hinzufügen</span></label>
-          </>}
+          </>
+          {!simple && ultra && <label className="check-line"><input type="checkbox" checked={draft.favorite} onChange={e => update('favorite', e.target.checked)}/><span>Zu Favoriten hinzufügen</span></label>}
           {simple && <p className="input-help">Tipp: Unter Einstellungen kannst du jederzeit in den Experten-Modus wechseln, um zusätzliche Felder zu bearbeiten.</p>}
           {error && <p className="error-box" role="alert">{error}</p>}
           <div className="sheet-actions">
@@ -1401,13 +1401,23 @@ export default function App() {
         </section>
       </div>}
 
-      {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async incoming => {
+      {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async (incoming, sourceColors = []) => {
         await mutateVault(current => {
+          const existingNames = new Set(categoriesForVault(current).map(category => category.name.toLocaleLowerCase('de')));
           let merged: VaultData = { ...current, entries: [...incoming, ...current.entries] };
           for (const entry of incoming) merged = ensureEntryCategories(merged, entry);
+          if (sourceColors.length && merged.categories) {
+            const imported = new Map(sourceColors.map(category => [category.name.toLocaleLowerCase('de'), category.color]));
+            merged = { ...merged, categories: merged.categories.map(category => {
+              const name = category.name.toLocaleLowerCase('de');
+              const color = imported.get(name);
+              return !existingNames.has(name) && color && /^#[0-9a-f]{6}$/i.test(color)
+                ? { ...category, color } : category;
+            }) };
+          }
           return merged;
         });
-        setNotice(incoming.length + ' Einträge verschlüsselt importiert');
+        setNotice(incoming.length + ' Einträge mit zugehörigen Bildern verschlüsselt importiert');
       }}/>}
       {showBackupPanel && <BackupPanel existing={entries} onClose={() => setShowBackupPanel(false)}
         onExport={exportVault} onImportVault={importEncryptedVault}/>}

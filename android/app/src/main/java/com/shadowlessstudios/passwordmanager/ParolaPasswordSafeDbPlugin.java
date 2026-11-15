@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.zetetic.database.sqlcipher.SQLiteDatabase;
@@ -41,6 +42,58 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
     private static final int MAX_BLOB_SIZE = 2_000_000;
     private static final int MAX_RESULT_CHARS = 18_000_000;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private static final long SESSION_TTL_MS = 30L * 60L * 1000L;
+    // Only the encrypted source cache and a SQLCipher database handle persist
+    // until import confirmation. The source master password is never retained.
+    private SQLiteDatabase activeImportDb;
+    private File activeImportFile;
+    private String activeImportSession;
+    private long sessionCreatedAt;
+
+    private void clearImportSession() {
+        if (activeImportDb != null) {
+            try { activeImportDb.close(); } catch (Exception ignored) {}
+            activeImportDb = null;
+        }
+        if (activeImportFile != null) {
+            try { if (activeImportFile.exists()) activeImportFile.delete(); }
+            catch (Exception ignored) {}
+            activeImportFile = null;
+        }
+        activeImportSession = null;
+        sessionCreatedAt = 0L;
+    }
+
+    @PluginMethod
+    public void getImage(PluginCall call) {
+        final String session = call.getString("session", "");
+        final String imageId = call.getString("imageId", "");
+        worker.execute(() -> {
+            if (activeImportDb == null || activeImportSession == null ||
+                !activeImportSession.equals(session) ||
+                System.currentTimeMillis() - sessionCreatedAt > SESSION_TTL_MS) {
+                clearImportSession();
+                call.reject("Import-Sitzung abgelaufen. Bitte die verschlüsselte Datenbank erneut öffnen.");
+                return;
+            }
+            try {
+                JSObject result = new JSObject();
+                result.put("image", PasswordSafeRelationalExporter.imageDataUri(activeImportDb, imageId));
+                call.resolve(result);
+            } catch (Exception failed) {
+                call.reject("Ein Originalbild konnte nicht gelesen werden. Es wurde noch nichts importiert.");
+            }
+        });
+    }
+
+    @PluginMethod
+    public void finishImport(PluginCall call) {
+        worker.execute(() -> {
+            clearImportSession();
+            call.resolve(new JSObject());
+        });
+    }
+
 
     @PluginMethod
     public void pickAndImport(PluginCall call) {
@@ -73,6 +126,7 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
         File temp = null;
         SQLiteDatabase db = null;
         try {
+            clearImportSession();
             System.loadLibrary("sqlcipher");
             temp = File.createTempFile("parola_sqlcipher_", ".db", getContext().getCacheDir());
             long total = 0;
@@ -112,8 +166,15 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
                     "Bitte Master-Passwort und Original-.db-Backup prüfen. " +
                     "Falls die Original-App die Sicherung öffnen kann, nutze alternativ den CSV-Export.");
             }
-            JSObject payload = exportTables(db);
-            payload.put("format", "sqlcipher-v" + version);
+            String session = UUID.randomUUID().toString();
+            JSObject payload = PasswordSafeRelationalExporter.export(
+                db, "sqlcipher-v" + version, session);
+            activeImportDb = db;
+            activeImportFile = temp;
+            activeImportSession = session;
+            sessionCreatedAt = System.currentTimeMillis();
+            db = null;
+            temp = null;
             getActivity().runOnUiThread(() -> call.resolve(payload));
         } catch (Exception ex) {
             // Don't echo exception text: SQL errors can disclose schema or rows.
@@ -279,5 +340,6 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
 
     @Override protected void handleOnDestroy() {
         worker.shutdownNow();
+        clearImportSession();
     }
 }

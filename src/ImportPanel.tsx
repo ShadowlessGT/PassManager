@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { nativePasswordSafeSupported, openEncryptedPasswordSafe, mapPasswordSafeDatabase } from './passwordSafeDb';
+import { useEffect, useRef, useState } from 'react';
+import {
+  nativePasswordSafeSupported, openEncryptedPasswordSafe, mapPasswordSafeDatabase,
+  loadPasswordSafeImage, finishPasswordSafeImport
+} from './passwordSafeDb';
 import type { ChangeEvent } from 'react';
 import { ArrowDownToLine, Check, FileSpreadsheet, ShieldCheck, X } from 'lucide-react';
 import type { VaultEntry } from './types';
@@ -27,7 +30,7 @@ const IMPORT_SOURCES = [
 type Props = {
   existing: VaultEntry[];
   onClose: () => void;
-  onImport: (newEntries: VaultEntry[]) => Promise<void>;
+  onImport: (newEntries: VaultEntry[], categoryColors?: Array<{ name: string; color: string }>) => Promise<void>;
 };
 
 export default function ImportPanel({ existing, onClose, onImport }: Props) {
@@ -39,6 +42,25 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
   const [sourceMaster, setSourceMaster] = useState('');
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
   const [allowPartial, setAllowPartial] = useState(false);
+  const [imageRefs, setImageRefs] = useState<Record<string, string[]>>({});
+  const [imageCount, setImageCount] = useState(0);
+  const [categoryCount, setCategoryCount] = useState(0);
+  const [historyCount, setHistoryCount] = useState(0);
+  const [categoryColors, setCategoryColors] = useState<Array<{ name: string; color: string }>>([]);
+  const [imageProgress, setImageProgress] = useState('');
+  const sourceSession = useRef<string | null>(null);
+
+  useEffect(() => () => {
+    if (sourceSession.current) void finishPasswordSafeImport().catch(() => {});
+    sourceSession.current = null;
+  }, []);
+
+  function closeImport() {
+    if (busy) return;
+    if (sourceSession.current) void finishPasswordSafeImport().catch(() => {});
+    sourceSession.current = null;
+    onClose();
+  }
 
   async function readFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -47,6 +69,13 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
     setSourceWarnings([]);
     setAllowPartial(false);
     setError('');
+    setImageRefs({});
+    setImageCount(0);
+    setCategoryCount(0);
+    setHistoryCount(0);
+    setCategoryColors([]);
+    if (sourceSession.current) await finishPasswordSafeImport().catch(() => {});
+    sourceSession.current = null;
     if (!selected) return;
     setBusy(true);
     try { setPreview(await loadImportFile(selected)); }
@@ -62,10 +91,23 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
     setError('');
     setSourceWarnings([]);
     setAllowPartial(false);
+    setImageRefs({});
+    setImageCount(0);
+    setCategoryCount(0);
+    setHistoryCount(0);
+    setCategoryColors([]);
     setBusy(true);
     try {
+      if (sourceSession.current) await finishPasswordSafeImport().catch(() => {});
+      sourceSession.current = null;
       const decrypted = await openEncryptedPasswordSafe(password);
       const mapped = mapPasswordSafeDatabase(decrypted);
+      sourceSession.current = mapped.sourceSession ?? null;
+      setImageRefs(mapped.imageRefsByEntryId ?? {});
+      setImageCount(mapped.imageCount ?? 0);
+      setCategoryCount(mapped.sourceCategoryCount ?? 0);
+      setHistoryCount(mapped.sourceHistoryCount ?? 0);
+      setCategoryColors(mapped.sourceCategories ?? []);
       setPreview({
         entries: mapped.entries,
         skipped: mapped.skippedRows,
@@ -74,6 +116,8 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
       });
       setSourceWarnings(mapped.warnings);
     } catch (reason) {
+      await finishPasswordSafeImport().catch(() => {});
+      sourceSession.current = null;
       setError(reason instanceof Error ? reason.message : 'Entschlüsselung fehlgeschlagen.');
     } finally {
       setBusy(false);
@@ -86,14 +130,37 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
   async function importNow() {
     if (!preview || toImport.length === 0 || (sourceWarnings.length > 0 && !allowPartial)) return;
     setBusy(true); setError('');
-    try { await onImport(toImport); setPreview(null); onClose(); }
-    catch (reason) { setError((reason as Error).message || 'Import fehlgeschlagen.'); }
-    finally { setBusy(false); }
+    try {
+      const pending = toImport.map(entry => ({ ...entry, images: [...entry.images] }));
+      const numberOfImages = pending.reduce((sum, entry) => sum + (imageRefs[entry.id]?.length ?? 0), 0);
+      let loaded = 0;
+      for (const entry of pending) {
+        const refs = imageRefs[entry.id] ?? [];
+        if (refs.length && !sourceSession.current) {
+          throw new Error('Die verschlüsselte Import-Sitzung ist nicht mehr vorhanden. Bitte Datei erneut öffnen.');
+        }
+        for (const imageId of refs) {
+          setImageProgress('Originalbilder werden übernommen: ' + (loaded + 1) + ' / ' + numberOfImages);
+          entry.images.push(await loadPasswordSafeImage(sourceSession.current!, imageId));
+          loaded++;
+        }
+      }
+      // Only persist after every requested image has been successfully fetched.
+      // A failed or expired image never causes silent partial import.
+      setImageProgress('Daten und Bilder werden gemeinsam verschlüsselt gespeichert...');
+      await onImport(pending, categoryColors);
+      await finishPasswordSafeImport().catch(() => {});
+      sourceSession.current = null;
+      setPreview(null);
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Import fehlgeschlagen.');
+    } finally { setImageProgress(''); setBusy(false); }
   }
 
-  return <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeImport(); }}>
     <section className="sheet import-sheet" role="dialog" aria-modal="true" aria-label="Passwörter importieren">
-      <header className="sheet-header"><FileSpreadsheet size={22}/><h2>Passwörter importieren</h2><button className="icon-btn" onClick={onClose} aria-label="Schließen"><X size={20}/></button></header>
+      <header className="sheet-header"><FileSpreadsheet size={22}/><h2>Passwörter importieren</h2><button className="icon-btn" onClick={closeImport} disabled={busy} aria-label="Schließen"><X size={20}/></button></header>
       <div className="editor-form">
         <div className="import-source-grid" role="group" aria-label="Passwortmanager auswählen">
           {IMPORT_SOURCES.map(([name]) =>
@@ -126,10 +193,14 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
           <input aria-label="Datei auswählen" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => void readFile(e)} disabled={busy}/>
           <small>CSV / XLSX: maximal 2 MB und 1000 Einträge. Verschlüsselte Fremdformate benötigen vorher einen Export in der Quell-App.</small>
         </label>
-        {busy && <p className="settings-note">Datei wird geprüft...</p>}
+        {busy && <p className="settings-note" aria-live="polite">{imageProgress || 'Datei wird geprüft...'}</p>}
         {error && <p className="error-box" role="alert">{error}</p>}
         {preview && <>
           <div className="import-stats"><h3>Vorschau: {preview.source}</h3><span>{preview.entries.length} erkannte Einträge</span></div>
+          {sourceSession.current && <p className="settings-note">
+            {imageCount} Originalbilder, {categoryCount} Kategorien und {historyCount} historische Passwortwerte erkannt.
+            Bilder werden erst beim sicheren Import einzeln und in Originalqualität übernommen.
+          </p>}
           <p className="settings-note">{preview.skipped} unvollständige Zeilen übersprungen. {checked!.duplicates} mögliche Dubletten (gleicher Name, Login und Website).</p>
           <label className="check-line"><input type="checkbox" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)}/> <span>Mögliche Dubletten überspringen</span></label>
           <div className="import-preview">
@@ -150,7 +221,7 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
             </label>
           </div>}
         </>}
-        <div className="sheet-actions"><button className="secondary-btn" onClick={onClose}>Abbrechen</button>
+        <div className="sheet-actions"><button className="secondary-btn" onClick={closeImport} disabled={busy}>Abbrechen</button>
           <button className="primary-btn" onClick={() => void importNow()} disabled={busy || toImport.length === 0 || (sourceWarnings.length > 0 && !allowPartial)}><ArrowDownToLine size={16}/> {toImport.length} sicher importieren <Check size={16}/></button>
         </div>
       </div>
