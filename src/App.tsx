@@ -5,16 +5,32 @@ import {
   Copy, Edit3, ExternalLink, Eye, EyeOff, Fingerprint, Folder,
   ImagePlus, KeyRound, LockKeyhole, LogOut, Mail, Plus, Search,
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
-  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal
+  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal, Archive
 } from 'lucide-react';
 import { newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
 import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
 import ImportPanel from './ImportPanel';
+import BackupPanel from './BackupPanel';
+import SecurityOptions from './SecurityOptions';
+import ChangeMasterPanel from './ChangeMasterPanel';
+import { skipDuplicates } from './importer';
+import { exportEncryptedBackup, exportVaultCsv, newBackupFilename } from './vaultTransfer';
+import { saveUserExport, saveUserBinaryExport } from './fileExport';
+import { exportVaultXlsx } from './xlsxExport';
+import { failedUnlocks, registerFailedUnlock, resetFailedUnlocks, shouldSelfDestruct } from './securityAttempts';
 import LicensePanel from './LicensePanel';
 import { lookupLicense } from './license';
 import { checkPlayLicenseServer } from './playBilling';
 import { freeEntryEditError } from './featureGate';
 import InsightsPanel from './InsightsPanel';
+import ArchivePanel from './ArchivePanel';
+import EntryAvatar from './EntryAvatar';
+import { entriesAt, moveEntry, eraseTrashedEntry } from './vaultLifecycle';
+import packageJson from '../package.json';
+import type { LocalSnapshot } from './storage';
+import { SNAPSHOT_INTERVALS } from './snapshotPolicy';
+import { calculatePasswordSecurity } from './securityDashboard';
+import { validateImportedVault } from './vaultTransfer';
 import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
 import { generateStrongPassword } from './passwordGenerator';
@@ -23,7 +39,7 @@ import { logActivity, trackPasswordHistory } from './insights';
 import { App as NativeApp } from '@capacitor/app';
 import CategoryPicker from './CategoryPicker';
 import CategoryManager from './CategoryManager';
-import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory } from './categories';
+import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory, categoryAndDescendants, categoryKey } from './categories';
 import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
 import type { UserPreferences } from './preferences';
 import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from './theme';
@@ -35,12 +51,12 @@ import { Clipboard } from '@capacitor/clipboard';
 import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
 import type { EncryptedEnvelope } from './crypto';
 import { verifyCloudVault, vaultRevision } from './cloudSafety';
-import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault } from './storage';
-import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice } from './device';
+import { readLocalVault, writeLocalVault, readPreviousLocalVault, replaceVaultWithVerifiedCloudCopy, restorePreviousLocalVault, saveLocalSnapshot, readLocalSnapshot, listLocalSnapshots, replaceVaultAfterPasswordChange, clearLocalVault } from './storage';
+import { biometricIsEnabled, deviceUnlockSupported, disableDeviceUnlock, enableDeviceUnlock, unlockWithDevice, setScreenshotProtection } from './device';
 import { cloudConfigured, cloudDeleteAccount, cloudDownload, cloudEmail, cloudSignIn, cloudSignInWithGoogle, cloudHasGoogleProvider, cloudSignOut, cloudUpload, onCloudEmailChange } from './cloud';
 import { googleSignInErrorText } from './googleAuthError';
 
-type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings';
+type Tab = 'vault' | 'favorites' | 'categories' | 'people' | 'insights' | 'settings' | 'archive';
 const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
   { id: 'vault', label: 'Tresor', icon: KeyRound },
   { id: 'favorites', label: 'Favoriten', icon: Star },
@@ -49,7 +65,7 @@ const NAV: { id: Tab; label: string; icon: typeof KeyRound }[] = [
   { id: 'settings', label: 'Einstellungen', icon: Settings2 }
 ];
 
-const NAV_TEXT = { vault: 'nav.vault', favorites: 'nav.favorites', categories: 'nav.categories', people: 'vault.my', insights: 'nav.insights', settings: 'nav.settings' } as const;
+const NAV_TEXT = { vault: 'nav.vault', favorites: 'nav.favorites', categories: 'nav.categories', people: 'vault.my', insights: 'nav.insights', settings: 'nav.settings', archive: 'nav.settings' } as const;
 const generatePassword = generateStrongPassword;
 
 function safeUrl(value: string): string | null {
@@ -90,6 +106,7 @@ type EditorProps = {
 function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave }: EditorProps) {
   const t = useTranslate();
   const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
+  const [tagsText,setTagsText] = useState((entry.tags??[]).join(', '));
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -146,6 +163,7 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
         ...draft,
         title: draft.title.trim(),
         categories: draft.categories,
+        tags: [...new Set(tagsText.split(',').map(tag=>tag.trim()).filter(Boolean))].slice(0,20),
         person: draft.person.trim(),
         updatedAt: Date.now(),
         passwordChangedAt: draft.passwordChangedAt !== entry.passwordChangedAt
@@ -228,7 +246,12 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
           <div className="form-section-title">Organisieren</div>
           <label>Person / Besitzer<input list="people-list" value={draft.person} onChange={e => update('person', e.target.value)} placeholder="z. B. Familie"/><datalist id="people-list">{people.map(person => <option key={person} value={person}/>)}</datalist></label>
           </>}
-          <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
+                     <label>Tags (mit Komma trennen)
+             <input maxLength={500} value={tagsText}
+               onChange={event=>setTagsText(event.target.value)}
+               placeholder="z. B. Arbeit, Banking, Wichtig"/>
+           </label>
+           <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
           {!simple && ultra && <>
           <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>
           <div className="form-section-title">Bilder und Anhänge</div>
@@ -287,6 +310,12 @@ export default function App() {
   const [previousBackupAvailable, setPreviousBackupAvailable] = useState(false);
   const [showAdvancedSecurity, setShowAdvancedSecurity] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
+  const [showBackupPanel, setShowBackupPanel] = useState(false);
+  const [showMasterChange, setShowMasterChange] = useState(false);
+  const [showLocalSnapshots,setShowLocalSnapshots] = useState(false);
+  const [localSnapshots,setLocalSnapshots] = useState<LocalSnapshot[]>([]);
+  const [snapshotBusy,setSnapshotBusy] = useState(false);
+  const [failedCount, setFailedCount] = useState(failedUnlocks);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
@@ -295,7 +324,49 @@ export default function App() {
   const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
+  const pendingClipboard = useRef<{ value: string; expiresAt: number; timer: number } | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
+  useEffect(() => {
+    document.documentElement.dataset.parolaAccent = preferences.accentColor;
+    document.documentElement.dataset.highContrast = preferences.highContrast?'true':'false';
+  },[preferences.accentColor,preferences.highContrast]);
+  useEffect(() => {
+    let active = true;
+    void setScreenshotProtection(preferences.screenshotsAllowed).catch(() => {
+      if (active) {
+        document.documentElement.classList.add('privacy-guard-failed');
+        setNotice('Android-Bildschirmschutz konnte nicht angewendet werden.');
+      }
+    });
+    return () => { active = false; };
+  }, [preferences.screenshotsAllowed]);
+
+  useEffect(() => {
+    const screenOff = () => { if (preferences.screenOffLock) lockVault(); };
+    window.addEventListener('parola-screen-off', screenOff);
+    return () => window.removeEventListener('parola-screen-off', screenOff);
+  }, [preferences.screenOffLock]);
+
+  async function clearCopiedValueWhenDue() {
+    const pending = pendingClipboard.current;
+    if (!pending || Date.now() < pending.expiresAt) return;
+    pendingClipboard.current = null;
+    window.clearTimeout(pending.timer);
+    try {
+      const content = await Clipboard.read();
+      if (content.value === pending.value) await Clipboard.write({ string: '' });
+    } catch { /* Device may block background clipboard reads. */ }
+  }
+  useEffect(() => {
+    if (!preferences.clipboardClearMs) {
+      const pending = pendingClipboard.current;
+      if (pending) window.clearTimeout(pending.timer);
+      pendingClipboard.current = null;
+    }
+    const onForeground = () => { if (!document.hidden) void clearCopiedValueWhenDue(); };
+    document.addEventListener('visibilitychange', onForeground);
+    return () => document.removeEventListener('visibilitychange', onForeground);
+  }, [preferences.clipboardClearMs]);
   useEffect(() => {
     const synchronize = () => applyLanguage(preferences.language);
     synchronize();
@@ -340,7 +411,7 @@ export default function App() {
     applyResolvedAppearance(resolveAppearance(preferences.appearance, systemDark));
   }, [preferences.appearance, systemDark]);
   useEffect(() => {
-    if (preferences.mode === 'simple' && !['vault','categories','settings'].includes(tab)) {
+    if (preferences.mode === 'simple' && !['vault','categories','settings','archive','insights'].includes(tab)) {
       setTab('vault'); setPersonFilter(null); setCategoryFilter(null);
     }
   }, [preferences.mode,tab]);
@@ -366,6 +437,7 @@ export default function App() {
     hiddenSince.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
     setShowOCR(false); setShowQuickAdd(false);
+    setShowBackupPanel(false); setShowMasterChange(false); setShowLocalSnapshots(false);
     setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
   }
@@ -415,6 +487,17 @@ export default function App() {
   }, [data !== null, preferences.backgroundLockMs, preferences.idleLockMs]);
 
 
+  useEffect(()=>{
+    if (!preferences.autoSnapshotEnabled || !key) return;
+    let active=true;
+    void writes.current.then(async()=>{
+      if(!active || !dataRef.current) return;
+      const encrypted = await readLocalVault();
+      if(encrypted) await saveLocalSnapshot(encrypted,preferences.autoSnapshotRetention,preferences.autoSnapshotIntervalMs);
+    }).catch(()=>setNotice('Lokale Sicherung konnte nicht erstellt werden.'));
+    return ()=>{active=false;};
+  },[preferences.autoSnapshotEnabled,preferences.autoSnapshotIntervalMs,preferences.autoSnapshotRetention,key]);
+
   async function gateSubmit(event: FormEvent) {
     event.preventDefault();
     setGateError('');
@@ -429,8 +512,41 @@ export default function App() {
       if (hasVault && !stored) throw new Error('Tresordatei wurde nicht gefunden.');
       const vaultSalt = stored?.salt ?? newSalt();
       const derived = await deriveVaultKey(master, vaultSalt);
-      const clear = stored ? await decryptVault(stored, derived) : newVault();
+      let clear: VaultData;
+      if (stored) {
+        try {
+          clear = await decryptVault(stored, derived);
+        } catch (reason) {
+          // Count only AES-GCM authentication failures, never storage outages
+          // or invalid data types. A damaged vault can produce the same error.
+          // Hence the destructive option is opt-in, with backup warnings.
+          if (preferences.selfDestructEnabled && reason instanceof DOMException &&
+              reason.name === 'OperationError') {
+            const attempts = registerFailedUnlock();
+            setFailedCount(attempts);
+            if (shouldSelfDestruct(true, preferences.selfDestructMaxAttempts, attempts)) {
+              await writes.current; // No earlier in-flight write may recreate a deleted vault.
+              await clearLocalVault();
+              try { await disableDeviceUnlock(); } catch { /* obsolete device key cannot decrypt a deleted vault */ }
+              resetFailedUnlocks();
+              setFailedCount(0);
+              setDeviceEnabled(false);
+              setHasVault(false);
+              setGateError('Nach zu vielen fehlgeschlagenen Versuchen wurde der lokale Tresor gelöscht. Eine vorhandene Cloud- oder Dateisicherung bleibt erhalten.');
+              return;
+            }
+            if (preferences.showRemainingAttempts) {
+              setGateError('Entsperren fehlgeschlagen. Noch ' +
+                Math.max(0, preferences.selfDestructMaxAttempts - attempts) + ' Versuche bis zur lokalen Löschung.');
+              return;
+            }
+          }
+          throw reason;
+        }
+      } else clear = newVault();
       if (!stored) await writeLocalVault(await encryptVault(clear, derived, vaultSalt));
+      resetFailedUnlocks();
+      setFailedCount(0);
       hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(vaultSalt); setData(clear); setHasVault(true);
@@ -447,6 +563,8 @@ export default function App() {
       if (!stored) throw new Error('Kein Tresor vorhanden.');
       const derived = await unlockWithDevice();
       const clear = await decryptVault(stored, derived);
+      resetFailedUnlocks();
+      setFailedCount(0);
       hiddenSince.current = null;
       dataRef.current = clear;
       setKey(derived); setSalt(stored.salt); setData(clear); lastActivity.current = Date.now();
@@ -464,6 +582,11 @@ export default function App() {
       const next = transform(current);
       const encrypted = await encryptVault(next, activeKey, activeSalt);
       await writeLocalVault(encrypted);
+      if (preferences.autoSnapshotEnabled) {
+        // Snapshot errors must never undo a successfully encrypted credential edit.
+        try { await saveLocalSnapshot(encrypted,preferences.autoSnapshotRetention,preferences.autoSnapshotIntervalMs); }
+        catch { setNotice('Eintrag gespeichert, aber lokale Zusatzsicherung fehlgeschlagen.'); }
+      }
       // Locking the UI must not be undone by a pending write.
       if (dataRef.current !== null) { dataRef.current = next; setData(next); }
     });
@@ -498,12 +621,19 @@ export default function App() {
     setNotice('Kategorie entfernt; Einträge bleiben erhalten');
   }
 
+  async function setEntryLocation(id: string, location: 'active'|'archived'|'trashed') {
+    await mutateVault(current => moveEntry(current, id, location));
+    setSelectedId(null);
+    setNotice(location==='active'?'Eintrag wiederhergestellt':location==='archived'?'Eintrag archiviert':'Eintrag in Papierkorb verschoben');
+  }
   async function deleteEntry(entry: VaultEntry) {
-    if (!window.confirm('Eintrag "' + entry.title + '" unwiderruflich löschen?')) return;
-    try {
-      await mutateVault(current => ({ ...current, entries: current.entries.filter(value => value.id !== entry.id) }));
-      setSelectedId(null); setNotice('Eintrag gelöscht');
-    } catch { setNotice('Löschen fehlgeschlagen'); }
+    if (!window.confirm('Eintrag "' + entry.title + '" in den Papierkorb verschieben? Er kann später wiederhergestellt werden.')) return;
+    try { await setEntryLocation(entry.id,'trashed'); }
+    catch { setNotice('Verschieben fehlgeschlagen'); }
+  }
+  async function eraseTrashed(id: string) {
+    await mutateVault(current => eraseTrashedEntry(current,id));
+    setNotice('Eintrag endgültig entfernt');
   }
 
   async function toggleFavorite(entry: VaultEntry) {
@@ -533,18 +663,162 @@ export default function App() {
   async function copyValue(value: string, label: string, entryId?: string, fieldType?: string) {
     try {
       await Clipboard.write({ string: value });
+      const previous = pendingClipboard.current;
+      if (previous) window.clearTimeout(previous.timer);
+      pendingClipboard.current = null;
+      if (preferences.clipboardClearMs > 0) {
+        const expiresAt = Date.now() + preferences.clipboardClearMs;
+        const timer = window.setTimeout(() => void clearCopiedValueWhenDue(), preferences.clipboardClearMs);
+        pendingClipboard.current = { value, expiresAt, timer };
+      }
       setNotice(label + ' kopiert');
       if (entryId) void recordActivity(entryId, 'copy', fieldType ?? label);
-    } catch { setNotice('Kopieren nicht möglich – Clipboard-Berechtigung prüfen'); }
-  }
-
-  async function clearHistory(entryId: string) {
+    } catch { setNotice('Kopieren nicht möglich - Clipboard-Berechtigung prüfen'); }
+  }  async function clearHistory(entryId: string) {
     try {
       await mutateVault(current => ({ ...current, entries: current.entries.map(entry =>
         entry.id === entryId ? { ...entry, passwordHistory: [] } : entry
       ) }));
       setNotice('Passwort-Historie gelöscht');
     } catch { setNotice('Historie konnte nicht gelöscht werden'); }
+  }
+
+  async function exportVault(format: 'encrypted' | 'csv' | 'xlsx') {
+    if (!key || !dataRef.current) throw new Error('Bitte zuerst den Tresor entsperren.');
+    if (format !== 'encrypted' && !window.confirm(
+      'ACHTUNG: CSV/XLSX enthalten Passwörter, PINs und weitere vertrauliche Angaben als Klartext. Die ausgewählte Datei ist NICHT verschlüsselt. Wirklich exportieren?'
+    )) return;
+    await writes.current;
+    const latest = dataRef.current;
+    if (!latest) throw new Error('Der Tresor wurde inzwischen gesperrt.');
+    if (format === 'encrypted') {
+      const encrypted = await readLocalVault();
+      if (!encrypted) throw new Error('Keine verschlüsselte Sicherung vorhanden.');
+      await saveUserExport(newBackupFilename('parola'), 'application/json', exportEncryptedBackup(encrypted));
+      setNotice('Verschlüsseltes Parola-Backup exportiert');
+    } else if (format === 'xlsx') {
+      const bytes=exportVaultXlsx({...latest,entries:entriesAt(latest,'active')});
+      await saveUserBinaryExport('Parola-'+new Date().toISOString().slice(0,10)+'.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',bytes);
+      setNotice('XLSX-Klartextdatei erstellt - bitte geschützt aufbewahren');
+    } else {
+      await saveUserExport(newBackupFilename('csv'), 'text/csv', exportVaultCsv({...latest,entries:entriesAt(latest,'active')}));
+      setNotice('CSV-Klartextdatei erstellt – bitte geschützt aufbewahren');
+    }
+  }
+
+  async function reloadSnapshots(){
+    setLocalSnapshots(await listLocalSnapshots());
+  }
+  async function createLocalSnapshot(){
+    if(snapshotBusy || !key) return;
+    setSnapshotBusy(true);
+    try{
+      await writes.current;
+      const current=await readLocalVault();
+      if(!current) throw new Error('Kein Tresor vorhanden.');
+      await saveLocalSnapshot(current,preferences.autoSnapshotRetention,0);
+      await reloadSnapshots();
+      setNotice('Lokale verschlüsselte Sicherung erstellt.');
+    }catch(error){setNotice(error instanceof Error?error.message:'Sicherung fehlgeschlagen.');}
+    finally{setSnapshotBusy(false);}
+  }
+  async function exportLocalSnapshot(id:string){
+    if(snapshotBusy || !key)return;
+    setSnapshotBusy(true);
+    try{
+      const encrypted=await readLocalSnapshot(id);
+      if(!encrypted)throw new Error('Sicherung nicht mehr vorhanden.');
+      await saveUserExport('Parola-Sicherung-'+id.slice(9)+'.parola','application/json',exportEncryptedBackup(encrypted));
+      setNotice('Verschlüsseltes Backup exportiert.');
+    }catch(error){setNotice(error instanceof Error?error.message:'Export fehlgeschlagen.');}
+    finally{setSnapshotBusy(false);}
+  }
+  async function restoreLocalSnapshot(id:string){
+    if(snapshotBusy || !key)return;
+    setSnapshotBusy(true);
+    try{
+      await writes.current;
+      const encrypted=await readLocalSnapshot(id);
+      if(!encrypted || encrypted.salt!==salt)throw new Error('Sicherung nicht vorhanden oder nicht mit aktuellem Master-Passwort verwendbar.');
+      validateImportedVault(await decryptVault(encrypted,key));
+      if(!window.confirm('Den aktuellen Tresor durch diese geprüfte, ältere lokale Sicherung ersetzen? Der bisherige Tresor bleibt als verschlüsselte Rückfallkopie erhalten.'))return;
+      await disableDeviceUnlock();
+      setDeviceEnabled(false);
+      await replaceVaultWithVerifiedCloudCopy(encrypted);
+      lockVault();
+      setHasVault(true);
+      window.alert('Lokale Sicherung wiederhergestellt. Bitte mit dem Master-Passwort erneut entsperren.');
+    }catch(error){setNotice(error instanceof Error?error.message:'Wiederherstellung fehlgeschlagen.');}
+    finally{setSnapshotBusy(false);}
+  }
+  async function importEncryptedVault(incoming: VaultData) {
+    let imported = 0;
+    await mutateVault(current => {
+      const { fresh } = skipDuplicates(current.entries, incoming.entries);
+      imported = fresh.length;
+      const cloned = fresh.map(entry => ({
+        ...entry,
+        id: crypto.randomUUID(),
+        fields: (entry.fields ?? []).map(field => ({ ...field, id: crypto.randomUUID() })),
+        categories: [...entry.categories],
+        images: [...entry.images]
+      }));
+      const knownCategories = categoriesForVault(current);
+      const names = new Set(knownCategories.map(category => category.name.toLocaleLowerCase('de')));
+      const incomingIds = new Map<string,string>();
+      for (const category of incoming.categories ?? []) {
+        if (!category || typeof category.name !== 'string') continue;
+        const name = category.name.trim();
+        if (!name || name.length > 70) continue;
+        const existing = knownCategories.find(item => item.name.toLocaleLowerCase('de') === name.toLocaleLowerCase('de'));
+        if (existing) { incomingIds.set(category.id, existing.id); continue; }
+        const newId=crypto.randomUUID();
+        knownCategories.push({ ...category, id:newId, parentId:undefined });
+        incomingIds.set(category.id,newId);
+        names.add(name.toLocaleLowerCase('de'));
+      }
+      for (const category of incoming.categories ?? []) {
+        const mapped = knownCategories.find(item=>item.id===incomingIds.get(category.id));
+        if (mapped && category.parentId && incomingIds.has(category.parentId) && incomingIds.get(category.id)!==incomingIds.get(category.parentId)) {
+          if (!current.categories?.some(item=>item.id===mapped.id)) mapped.parentId=incomingIds.get(category.parentId);
+        }
+      }
+      let merged: VaultData = {
+        ...current,
+        entries: [...cloned, ...current.entries],
+        categories: knownCategories
+      };
+      for (const entry of cloned) merged = ensureEntryCategories(merged, entry);
+      return merged;
+    });
+    setNotice(imported + ' Einträge aus verschlüsseltem Backup importiert');
+  }
+
+  async function changeMasterPassword(previous: string, next: string) {
+    if (!key || !dataRef.current) throw new Error('Tresor gesperrt.');
+    await writes.current;
+    const encrypted = await readLocalVault();
+    if (!encrypted) throw new Error('Kein Tresor vorhanden.');
+    const previousKey = await deriveVaultKey(previous, encrypted.salt);
+    // Only the correct current master password may rotate the key.
+    const clear = await decryptVault(encrypted, previousKey);
+    const newVaultSalt = newSalt();
+    const nextKey = await deriveVaultKey(next, newVaultSalt);
+    const replacement = await encryptVault(clear, nextKey, newVaultSalt);
+    await replaceVaultAfterPasswordChange(replacement);
+    // Current UI is now bound to the new key, even if removing an obsolete
+    // biometric key fails afterward.
+    dataRef.current = clear;
+    setKey(nextKey);
+    setSalt(newVaultSalt);
+    setPreviousBackupAvailable(false); // Old password-derived recovery copy was purged.
+    try { await disableDeviceUnlock(); }
+    catch { /* Old biometric key cannot unlock the new encrypted envelope. */ }
+    setDeviceEnabled(false);
+    resetFailedUnlocks();
+    setFailedCount(0);
+    setNotice('Master-Passwort geändert. Biometrie erneut aktivieren und Sicherung aktualisieren.');
   }
 
   async function toggleDevice() {
@@ -664,17 +938,18 @@ export default function App() {
     } finally { setCloudBusy(false); }
   }
 
-  const entries = data?.entries ?? [];
+  const entries = data ? entriesAt(data,'active') : [];
   const categories = useMemo(() => data ? categoriesForVault(data) : [], [data]);
+  const securitySummary=useMemo(()=>data?calculatePasswordSecurity(data):null,[data]);
   const simple = preferences.mode === 'simple';
   const selectedAppearance = resolveAppearance(preferences.appearance, systemDark);
   const people = useMemo(() => [...new Set(entries.map(item => item.person).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')), [data]);
   const filtered = useMemo(() => entries.filter(item => {
     if (tab === 'favorites' && !item.favorite) return false;
-    if (categoryFilter && !item.categories.includes(categoryFilter)) return false;
+    if (categoryFilter && !item.categories.some(name=>categoryAndDescendants(categories,categoryFilter).has(categoryKey(name)))) return false;
     if (personFilter && item.person !== personFilter) return false;
     const needle = query.toLocaleLowerCase('de');
-    return [item.title, item.description, item.username, item.email, item.website, item.person, ...item.categories, ...(item.fields ?? []).map(field => field.label)]
+    return [item.title, item.description, item.username, item.email, item.website, item.person, ...item.categories, ...(item.tags??[]), ...(item.fields ?? []).map(field => field.label)]
       .some(value => value.toLocaleLowerCase('de').includes(needle));
   }).sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt), [data, tab, categoryFilter, personFilter, query]);
   const selected = entries.find(item => item.id === selectedId) ?? null;
@@ -719,6 +994,9 @@ export default function App() {
             </label>
           </>}
           {gateError && <p className="error-box" role="alert">{gateError}</p>}
+          {hasVault && preferences.selfDestructEnabled && preferences.showRemainingAttempts && <p className="master-warning" role="status">
+            Noch {Math.max(0, preferences.selfDestructMaxAttempts - failedCount)} Versuche bis zur Löschung des lokalen Tresors.
+          </p>}
           <button className="primary-btn full" type="submit" disabled={working}>{working ? 'Bitte prüfen...' : hasVault ? t('auth.unlock') : t('auth.create')} <ArrowLeft className="arrow-right" size={18}/></button>
         </form>
         {hasVault && deviceSupported && deviceEnabled && <button className="biometric-btn" disabled={working} onClick={() => void deviceUnlock()}><Fingerprint size={21}/> {l('biometricOpen')}</button>}
@@ -729,7 +1007,7 @@ export default function App() {
     </main>
   );
 
-  const sectionTitle = tab === 'vault' ? t('vault.my') : t(NAV_TEXT[tab]);
+  const sectionTitle = tab === 'archive' ? 'Archiv und Papierkorb' : tab === 'vault' ? t('vault.my') : t(NAV_TEXT[tab]);
   const showEntries = tab === 'vault' || tab === 'favorites' || (tab === 'categories' && categoryFilter) || (tab === 'people' && personFilter);
 
   return (
@@ -760,9 +1038,16 @@ export default function App() {
 
           {tab === 'vault' && <div className="quick-action-strip">
             <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={22}/> {simple ? 'Passwort hinzufügen' : 'Schnell speichern'}</button>
+            <button type="button" className="quick-secondary" onClick={() => setTab('archive')}><Archive size={19}/> Archiv / Papierkorb</button>
             {!simple && <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> Aus Bild erkennen</button>}
           </div>}
 
+          {tab === 'vault' && securitySummary && <button className="security-digest" type="button" onClick={()=>setTab('insights')}>
+            <ShieldCheck size={21}/>
+            <span><strong>Sicherheitscenter</strong><small>{securitySummary.score===null?'Noch keine Passwörter':
+              securitySummary.score+'/100 · '+securitySummary.recommendations.length+' Empfehlungen'} · Lokal geprüft</small></span>
+            <ChevronRight size={20}/>
+          </button>}
           {tab === 'vault' && !simple && <div className="welcome-panel">
             <div><span className="welcome-shield"><Shield size={21}/></span><h2>Alles an einem sicheren Ort.</h2><p>Deine sensiblen Daten sind lokal verschlüsselt und nur für dich sichtbar.</p></div>
             <div className="welcome-visual"><KeyRound size={45} strokeWidth={1.5}/></div>
@@ -777,7 +1062,11 @@ export default function App() {
             <button type="button" className="text-btn" onClick={() => setTab('people')}>Personen anzeigen</button>
           </div>}
           {tab === 'insights' && <InsightsPanel data={data} onOpen={openEntry} onDeleteHistory={clearHistory}/>}
-          {tab === 'categories' && !categoryFilter && <CategoryManager simple={simple}
+                     {tab === 'archive' && <ArchivePanel vault={data}
+             onRestore={id=>setEntryLocation(id,'active')}
+             onTrash={id=>setEntryLocation(id,'trashed')}
+             onErase={eraseTrashed}/>}
+           {tab === 'categories' && !categoryFilter && <CategoryManager simple={simple}
             categories={categories} entries={entries}
             onOpen={name => { setCategoryFilter(name); setQuery(''); }}
             onSave={saveCategory} onDelete={deleteCategory}/>}
@@ -797,12 +1086,12 @@ export default function App() {
               {filtered.map(item => (
                 <article className="entry-card" key={item.id}>
                   <button className="entry-open" onClick={() => openEntry(item.id)} aria-label={item.title + ' öffnen'}>
-                    <span className="entry-avatar">{item.images[0] ? <img src={item.images[0]} alt=""/> : getInitials(item.title)}</span>
+                    <EntryAvatar item={item} allowRemote={preferences.websiteIconsEnabled}/>
                     <span className="entry-text"><strong>{item.title}</strong><small>{item.email || item.username || item.description || (simple ? 'Zum Öffnen antippen' : 'Sicherer Eintrag')}</small>
-                      <span className="mini-tags">{item.person && <em>{item.person}</em>}{item.categories.slice(0, 2).map(category => <em key={category}>{category}</em>)}</span></span>
+                      <span className="mini-tags">{item.person && <em>{item.person}</em>}{item.categories.slice(0, 2).map(category => <em key={category}>{category}</em>)}{(item.tags??[]).slice(0,2).map(tag=><em key={tag}>#{tag}</em>)}</span></span>
                   </button>
                   <div className="entry-actions">
-                    {simple ? <button className="simple-copy-btn" type="button" aria-label={'Passwort für '+item.title+' kopieren'}
+                    {!preferences.copyButtonsVisible ? null : simple ? <button className="simple-copy-btn" type="button" aria-label={'Passwort für '+item.title+' kopieren'}
                       onClick={() => void copyValue(item.password, 'Passwort', item.id, 'Passwort')} disabled={!item.password}>
                       <Copy size={19}/> Kopieren
                     </button> :
@@ -891,6 +1180,22 @@ export default function App() {
               <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}><ArrowDownToLine size={17}/> Import-Assistent öffnen</button>
             </section>
             </>}
+            {simple && <section className="settings-card">
+              <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span>
+                <div><h2>Passwörter aus anderer App importieren</h2>
+                  <p>Google Passwortmanager, Password Safe, Bitwarden, KeePass, 1Password und viele weitere per CSV / Excel.</p></div></div>
+              <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}>
+                <ArrowDownToLine size={17}/> Import-Assistent öffnen
+              </button>
+            </section>}
+            <section className="settings-card">
+              <div className="settings-heading"><span className="settings-icon"><ShieldCheck size={22}/></span>
+                <div><h2>Import, Export und Wiederherstellung</h2>
+                  <p>Ein vollständiges verschlüsseltes .parola-Backup erstellen, importieren oder eine CSV für andere Apps exportieren.</p></div></div>
+              <button className="primary-btn" type="button" onClick={() => setShowBackupPanel(true)}>
+                <ArrowUpToLine size={17}/> Backup und Export öffnen
+              </button>
+            </section>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
               <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
@@ -913,6 +1218,13 @@ export default function App() {
               </div>}
               <button className="outline-btn" type="button" onClick={lockVault}><LogOut size={17}/> Tresor jetzt sperren</button>
             </section>
+
+            <SecurityOptions preferences={preferences} onChange={next => {
+              if (next.selfDestructEnabled !== preferences.selfDestructEnabled) { resetFailedUnlocks(); setFailedCount(0); }
+              setPreferences(next);
+            }}
+              onChangeMaster={() => setShowMasterChange(true)}
+              onBackup={() => setShowBackupPanel(true)}/>
 
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon cloud"><Cloud size={22}/></span><div><h2>{simple ? 'Meine Passwörter sichern' : 'Firebase Cloud-Backup'}</h2><p>{simple ? 'Freiwillige Sicherung für einen späteren Handywechsel.' : 'Optional – nur verschlüsselte Tresordaten werden übertragen.'}</p></div></div>
@@ -951,7 +1263,90 @@ export default function App() {
             </section>
 
             </>}
-            <p className="version-line">Passwort Manager: Parola v0.7.4 · Shadowless Studios · Offline-first</p>
+            <section className="settings-card">
+              <div className="settings-heading"><div><h2>Automatische verschlüsselte Sicherungen</h2>
+                <p>Zusätzliche Wiederherstellungspunkte auf diesem Gerät.</p></div></div>
+              <div className="settings-row"><div><strong>Automatisch sichern</strong>
+                <small>Nur bei Änderungen oder Entsperrung der App. Standardmäßig deaktiviert.</small></div>
+                <button type="button" className={preferences.autoSnapshotEnabled?'toggle active':'toggle'}
+                  aria-pressed={preferences.autoSnapshotEnabled} aria-label="Automatische lokale Backups" onClick={()=>
+                    setPreferences(old=>({...old,autoSnapshotEnabled:!old.autoSnapshotEnabled}))}><span/></button>
+              </div>
+              <div className="setting-timeouts">
+                <label>Intervall <select value={preferences.autoSnapshotIntervalMs}
+                  onChange={e=>setPreferences(old=>({...old,autoSnapshotIntervalMs:Number(e.target.value)}))}>
+                  {SNAPSHOT_INTERVALS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
+                </select></label>
+                <label>Maximale Sicherungsanzahl <select value={preferences.autoSnapshotRetention}
+                  onChange={e=>setPreferences(old=>({...old,autoSnapshotRetention:Number(e.target.value)}))}>
+                  {[3,5,10,20,30].map(count=><option key={count} value={count}>{count}</option>)}
+                </select></label>
+              </div>
+              <p className="master-warning"><strong>Speicherziel: lokal im App-Speicher (verschlüsselt).</strong>
+                Diese Kopien überstehen eine Deinstallation oder einen Geräteverlust nicht.
+                Für echte externe Backups bitte regelmäßig eine .parola-Datei exportieren.</p>
+              <div className="cloud-buttons">
+                <button className="secondary-btn" type="button" disabled={snapshotBusy}
+                  onClick={()=>void createLocalSnapshot()}>Jetzt verschlüsselt sichern</button>
+                <button className="outline-btn" type="button" onClick={()=>{
+                  if(!showLocalSnapshots){void reloadSnapshots().catch(()=>setNotice('Sicherungen nicht lesbar.'));}
+                  setShowLocalSnapshots(!showLocalSnapshots);
+                }}>{showLocalSnapshots?'Sicherungsliste schließen':'Gespeicherte Sicherungen anzeigen'}</button>
+              </div>
+              {showLocalSnapshots && <div className="archive-rows">{localSnapshots.length===0?
+                <p className="settings-note">Noch keine lokalen Wiederherstellungspunkte.</p>:
+                localSnapshots.map(snapshot=><div className="archive-row" key={snapshot.id}>
+                  <strong>{new Date(snapshot.createdAt).toLocaleString('de-DE')}</strong>
+                  <div className="archive-actions">
+                    <button type="button" className="secondary-btn" disabled={snapshotBusy} onClick={()=>void exportLocalSnapshot(snapshot.id)}>Exportieren</button>
+                    <button type="button" className="outline-btn" disabled={snapshotBusy} onClick={()=>void restoreLocalSnapshot(snapshot.id)}>Wiederherstellen</button>
+                  </div>
+                </div>)}</div>}
+            </section>
+            <section className="settings-card">
+              <div className="settings-heading"><div><h2>Darstellung und Symbole</h2>
+                <p>Persönliche Einstellungen ohne Änderungen an verschlüsselten Zugangsdaten.</p></div></div>
+              <div className="setting-timeouts">
+                <label>Akzentfarbe
+                  <select value={preferences.accentColor} onChange={e=>setPreferences(old=>({...old,accentColor:e.target.value as UserPreferences['accentColor']}))}>
+                    <option value="blue">Parola-Blau</option><option value="teal">Türkis</option><option value="violet">Violett</option>
+                  </select>
+                </label>
+              </div>
+              <div className="settings-row"><div><strong>Hoher Kontrast</strong><small>Lesbare Konturen, deutlichere Hervorhebungen.</small></div>
+                <button type="button" aria-label="Hoher Kontrast" aria-pressed={preferences.highContrast}
+                  className={preferences.highContrast?'toggle active':'toggle'} onClick={()=>setPreferences(old=>({...old,highContrast:!old.highContrast}))}><span/></button>
+              </div>
+              <div className="settings-row"><div><strong>Kopierbuttons in der Liste anzeigen</strong>
+                <small>Die Detailansicht bleibt unabhängig davon nutzbar.</small></div>
+                <button type="button" aria-label="Kopierbuttons anzeigen" aria-pressed={preferences.copyButtonsVisible}
+                  className={preferences.copyButtonsVisible?'toggle active':'toggle'} onClick={()=>setPreferences(old=>({...old,copyButtonsVisible:!old.copyButtonsVisible}))}><span/></button>
+              </div>
+              <div className="settings-row"><div><strong>Passwortlänge beim Maskieren anzeigen</strong>
+                <small>Wenn aus, immer acht Punkte. Wenn an, bis zu 32 Punkte nach Länge.</small></div>
+                <button type="button" aria-label="Passwortlänge maskiert anzeigen" aria-pressed={preferences.maskLength}
+                  className={preferences.maskLength?'toggle active':'toggle'} onClick={()=>setPreferences(old=>({...old,maskLength:!old.maskLength}))}><span/></button>
+              </div>
+              <div className="settings-row"><div><strong>Website-Symbole direkt laden</strong>
+                <small>Optional: favicons von gespeicherten HTTPS-Websites laden. Domains werden beim Laden dem jeweiligen Betreiber bekannt; nicht über einen externen Icon-Dienst.</small></div>
+                <button type="button" aria-label="Website-Favicons laden" aria-pressed={preferences.websiteIconsEnabled}
+                  className={preferences.websiteIconsEnabled?'toggle active':'toggle'} onClick={()=>{
+                    if(!preferences.websiteIconsEnabled && !window.confirm('Externe Website-Icons werden bei den angegebenen HTTPS-Websites abgerufen. Die Website sieht dabei deine IP-Adresse. Aktivieren?'))return;
+                    setPreferences(old=>({...old,websiteIconsEnabled:!old.websiteIconsEnabled}));
+                  }}><span/></button>
+              </div>
+            </section>
+            <section className="settings-card">
+              <div className="settings-heading"><div><h2>Archiv und Papierkorb</h2><p>Einträge wiederherstellen oder gezielt dauerhaft löschen.</p></div></div>
+              <button type="button" className="secondary-btn" onClick={()=>setTab('archive')}><Archive size={17}/> Archiv / Papierkorb öffnen</button>
+            </section>
+            <section className="settings-card">
+              <div className="settings-heading"><div><h2>Über Parola</h2><p>Versionsinformation und Änderungsübersicht</p></div></div>
+              <p className="settings-note">App-Version {packageJson.version} · Entwicklungsstand · Offline-first</p>
+              <details><summary>Neuigkeiten im Entwicklungsbranch</summary>
+                <p className="settings-note">Sicherheits-Dashboard, erweiterte Statistiken und wiederherstellbarer Papierkorb. Nicht Teil einer veröffentlichten 0.7.5.</p>
+              </details>
+            </section>
           </div>}
         </main>
       </div>
@@ -961,11 +1356,11 @@ export default function App() {
       {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
           <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
-          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}</div></div>
+          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
           <div className="detail-fields">
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
-            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : '••••••••••••'}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : preferences.maskLength ? '\u2022'.repeat(Math.min(32,[...selected.password].length)) : '\u2022'.repeat(8)}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
             {simple && <button type="button" className="secondary-btn show-more-entry" onClick={() => setShowExtraDetails(value => !value)}>
               {showExtraDetails ? 'Weniger anzeigen' : 'Weitere Informationen anzeigen'}
             </button>}
@@ -1000,14 +1395,23 @@ export default function App() {
             {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} alt={'Anhang ' + (index + 1)}/>)}</div></div>}
             </>}
           </div>
-          <div className="detail-footer"><span>Aktualisiert am {formatDate(selected.updatedAt)}</span><button className="danger-btn" type="button" onClick={() => void deleteEntry(selected)}><Trash2 size={16}/> Löschen</button></div>
+          <div className="detail-footer"><span>Aktualisiert am {formatDate(selected.updatedAt)}</span>
+            <button className="secondary-btn" type="button" onClick={() => void setEntryLocation(selected.id,'archived')}><Archive size={16}/> Archivieren</button>
+            <button className="danger-btn"  type="button" onClick={() => void deleteEntry(selected)}><Trash2 size={16}/> Papierkorb</button></div>
         </section>
       </div>}
 
       {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async incoming => {
-        await mutateVault(current => ({ ...current, entries: [...incoming, ...current.entries] }));
+        await mutateVault(current => {
+          let merged: VaultData = { ...current, entries: [...incoming, ...current.entries] };
+          for (const entry of incoming) merged = ensureEntryCategories(merged, entry);
+          return merged;
+        });
         setNotice(incoming.length + ' Einträge verschlüsselt importiert');
       }}/>}
+      {showBackupPanel && <BackupPanel existing={entries} onClose={() => setShowBackupPanel(false)}
+        onExport={exportVault} onImportVault={importEncryptedVault}/>}
+      {showMasterChange && <ChangeMasterPanel onClose={() => setShowMasterChange(false)} onChange={changeMasterPassword}/>}
       {restoreCandidate && <div className="overlay" role="presentation">
         <section className="sheet cloud-restore-sheet" role="dialog" aria-modal="true" aria-label="Cloud-Sicherung prüfen">
           <header className="sheet-header"><ShieldCheck size={21}/><h2>Sicherung sicher wiederherstellen</h2>

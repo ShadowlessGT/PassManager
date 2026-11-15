@@ -57,7 +57,7 @@ const alias: Record<string, string> = {
   favorite:'favorite', favoriten:'favorite', favorit:'favorite',
   pin:'pin', adresse:'address', address:'address',
   created:'createdAt', createdat:'createdAt', erstellt:'createdAt',
-  passwordchangedat:'passwordChangedAt', passwordupdatedat:'passwordChangedAt',
+  passwortgeändertam:'passwordChangedAt', passwortgeaendertam:'passwordChangedAt', passwordchangedat:'passwordChangedAt', passwordupdatedat:'passwordChangedAt',
   passwordsetat:'passwordChangedAt'
 };
 
@@ -70,7 +70,7 @@ function dateValue(value: string): number | undefined {
 function fieldKind(header: string): FieldKind {
   const h = normalized(header);
   if (h.includes('pin')) return 'pin';
-  if (/pass|secret|token|recovery|key|code/.test(h)) return 'secret';
+  if (/pass|secret|token|recovery|wiederherstellung|schl[uü]ssel|key|code|kartennummer|cardnumber/.test(h)) return 'secret';
   if (/url|website|homepage|link/.test(h)) return 'url';
   if (/email|mail/.test(h)) return 'email';
   if (/note|comment|kommentar|beschreibung|address|adresse/.test(h)) return 'multiline';
@@ -105,12 +105,22 @@ export function rowsToVaultEntries(rows: (string | number | Date | boolean | nul
     record.fields = [];
     record.createdAt = Date.now();
     const extra: string[] = [];
+    const mapped = new Set<string>();
     headers.forEach((header, index) => {
       if (!header) return;
       const cell = raw[index];
       const value = cell instanceof Date ? cell.toISOString() : String(cell ?? '');
-      if (!value) return;
-      const known = alias[normalized(header)] ?? '';
+      const canonical = alias[normalized(header)] ?? '';
+      if (!value) {
+        if (canonical) mapped.add(canonical); // Reserve empty primary columns, too.
+        return;
+      }
+      // Exports from Password Safe and similar apps may repeat columns named
+      // 'Passwort', 'Benutzername' or 'Kommentar'. The first nonempty value
+      // maps to Parola's primary field; subsequent values must survive as
+      // individual encrypted custom fields, never silently overwrite it.
+      const known = mapped.has(canonical) ? '' : canonical;
+      if (canonical && known) mapped.add(canonical);
       switch (known) {
         case 'title': record.title = value; break;
         case 'username': record.username = value; break;
@@ -127,7 +137,7 @@ export function rowsToVaultEntries(rows: (string | number | Date | boolean | nul
         case 'createdAt': record.createdAt = dateValue(value) ?? record.createdAt; break;
         case 'passwordChangedAt': record.passwordChangedAt = dateValue(value); break;
         default: {
-          // Never silently discard unrecognized data; preserve it as an encrypted custom field.
+          // Never silently discard duplicate or unrecognized values.
           if (record.fields!.length >= 50) extra.push(header);
           else record.fields!.push(makeField(header, fieldKind(header), value));
         }
@@ -144,7 +154,13 @@ export function rowsToVaultEntries(rows: (string | number | Date | boolean | nul
 export async function loadImportFile(file: File): Promise<ImportPreview> {
   if (file.size > 2_000_000) throw new Error('Importdatei zu groß (maximal 2 MB).');
   const ext = file.name.toLowerCase().split('.').pop();
+  if (['db', 'kdbx', '1pux'].includes(ext ?? ''))
+    throw new Error('Verschlüsselte Fremd-Datenbanken lassen sich nicht ohne Originalformat und Passwort öffnen. Bitte in der ursprünglichen App zuerst als CSV exportieren.');
+
   if (ext === 'csv') return rowsToVaultEntries(parseDelimited(await file.text()), file.name);
+  if (ext === 'db') {
+    throw new Error('Verschlüsselte .db-Dateien anderer Passwortmanager lassen sich nicht ohne das Originalformat und Sicherungspasswort öffnen. Bitte in der ursprünglichen App als CSV exportieren und dann in Parola importieren.');
+  }
   if (ext === 'xlsx') {
     const rows = await readSheet(file);
     if (!Array.isArray(rows) || !rows.every(row => Array.isArray(row))) {
@@ -157,7 +173,7 @@ export async function loadImportFile(file: File): Promise<ImportPreview> {
     }));
     return rowsToVaultEntries(safeRows, file.name);
   }
-  throw new Error('Bitte eine CSV- oder XLSX-Datei auswählen. Alte .xls-Dateien zuerst in .xlsx konvertieren.');
+  throw new Error('Unterstützt werden CSV und XLSX. Bei verschlüsselten Fremd-Datenbanken zuerst in der ursprünglichen App exportieren.');
 }
 
 export function skipDuplicates(existing: VaultEntry[], incoming: VaultEntry[]): { fresh: VaultEntry[]; duplicates: number } {

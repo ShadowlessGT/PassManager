@@ -5,6 +5,24 @@ import type { VaultEntry } from './types';
 import { loadImportFile, skipDuplicates } from './importer';
 import type { ImportPreview } from './importer';
 
+const IMPORT_SOURCES = [
+  ['Google Passwortmanager', 'CSV-Export aus Chrome bzw. Google Passwortmanager'],
+  ['Password Safe', 'CSV-Export aus Password Safe (auch mit mehrfachen Zusatzfeldern)'],
+  ['iCloud Schlüsselbund', 'CSV-Export aus Apple Passwörter / Safari'],
+  ['Bitwarden', 'Unverschlüsselten CSV-Export wählen, nicht JSON mit Kryptografie'],
+  ['KeePass', 'Als CSV exportieren – .kdbx ist hier nicht direkt entschlüsselbar'],
+  ['1Password', 'CSV-Export verwenden – verschlüsselte .1pux nicht direkt importierbar'],
+  ['Samsung Pass', 'Falls verfügbar als CSV exportieren'],
+  ['Dashlane', 'CSV-Export verwenden'],
+  ['Enpass', 'CSV-Export verwenden'],
+  ['Keeper', 'CSV-Export verwenden'],
+  ['LastPass', 'CSV-Export verwenden'],
+  ['NordPass', 'CSV-Export verwenden'],
+  ['Proton Pass', 'CSV-Export verwenden'],
+  ['RoboForm', 'CSV-Export verwenden'],
+  ['Andere App', 'Jede App, die eine CSV- oder XLSX-Datei exportieren kann']
+] as const;
+
 type Props = {
   existing: VaultEntry[];
   onClose: () => void;
@@ -16,6 +34,7 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [skipExisting, setSkipExisting] = useState(true);
+  const [selectedSource, setSelectedSource] = useState<string>('Password Safe');
 
   async function readFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -44,10 +63,18 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
     <section className="sheet import-sheet" role="dialog" aria-modal="true" aria-label="Passwörter importieren">
       <header className="sheet-header"><FileSpreadsheet size={22}/><h2>CSV / Excel importieren</h2><button className="icon-btn" onClick={onClose} aria-label="Schließen"><X size={20}/></button></header>
       <div className="editor-form">
+        <div className="import-source-grid" role="group" aria-label="Passwortmanager auswählen">
+          {IMPORT_SOURCES.map(([name]) =>
+            <button key={name} type="button" aria-pressed={selectedSource === name}
+              className={selectedSource === name ? 'import-source active' : 'import-source'}
+              onClick={() => setSelectedSource(name)}>{name}</button>
+          )}
+        </div>
+        <p className="settings-note"><strong>{selectedSource}:</strong> {IMPORT_SOURCES.find(([name]) => name === selectedSource)?.[1]}</p>
         <div className="info-panel"><ShieldCheck size={22}/><p>Die Datei wird ausschließlich lokal eingelesen. Klartextdateien werden nicht an Firebase oder einen Server übertragen. Bestätigte Einträge werden mit deinem Master-Schlüssel verschlüsselt gespeichert.</p></div>
-        <label className="import-drop">CSV- oder XLSX-Datei auswählen
-          <input aria-label="Datei auswählen" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => void readFile(e)} disabled={busy}/>
-          <small>Bis 2 MB / 1000 Einträge pro Import. Erste Tabellenregisterkarte bei Excel.</small>
+        <label className="import-drop">Exportdatei von {selectedSource} auswählen
+          <input aria-label="Datei auswählen" type="file" accept=".csv,.xlsx,.db,.kdbx,.1pux,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => void readFile(e)} disabled={busy}/>
+          <small>CSV / XLSX: maximal 2 MB und 1000 Einträge. Verschlüsselte Fremdformate benötigen vorher einen Export in der Quell-App.</small>
         </label>
         {busy && <p className="settings-note">Datei wird geprüft...</p>}
         {error && <p className="error-box" role="alert">{error}</p>}

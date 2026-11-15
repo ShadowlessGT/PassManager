@@ -6,10 +6,15 @@ import { fromBase64, toBase64 } from './crypto';
 
 const KEY_ID = 'vault-unlock-key-v1';
 
-export async function preparePrivacyScreen(): Promise<void> {
+export async function preparePrivacyScreen(allowScreenshots = false): Promise<void> {
   if (Capacitor.isNativePlatform()) {
-    await PrivacyScreen.enable();
+    if (allowScreenshots) await PrivacyScreen.disable();
+    else await PrivacyScreen.enable();
   }
+}
+
+export async function setScreenshotProtection(allowScreenshots: boolean): Promise<void> {
+  await preparePrivacyScreen(allowScreenshots);
 }
 
 export async function deviceUnlockSupported(): Promise<boolean> {

@@ -1,4 +1,5 @@
 import type { ActivityKind, EntryActivity, VaultData, VaultEntry } from './types';
+import { entriesAt } from './vaultLifecycle';
 
 export type RankedItem = { name: string; count: number };
 export type SecuritySummary = {
@@ -73,7 +74,7 @@ function count(map: Map<string, number>, key: string, increment = 1) {
 // All analysis runs in device memory AFTER decrypting. Results are never uploaded,
 // and no plaintext password is included in the resulting statistical snapshot.
 export function calculateInsights(vault: VaultData): VaultInsights {
-  const entries = vault.entries;
+  const entries = entriesAt(vault, 'active');
   const categories = new Map<string, number>();
   for (const folder of vault.categories ?? []) categories.set(folder.name, 0);
   const fieldTypes = new Map<string, number>();

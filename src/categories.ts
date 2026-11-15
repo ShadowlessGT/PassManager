@@ -18,7 +18,7 @@ export function makeCategory(name: string, icon = 'folder', color: string = CATE
     id: crypto.randomUUID(),
     name: normalizedName,
     icon: CATEGORY_ICONS.some(item => item.value === icon) ? icon : 'folder',
-    color: CATEGORY_COLORS.includes(color as typeof CATEGORY_COLORS[number]) ? color : CATEGORY_COLORS[0]
+    color: /^#[0-9a-f]{6}$/i.test(color) ? color : CATEGORY_COLORS[0]
   };
 }
 
@@ -58,6 +58,19 @@ export function upsertCategory(vault: VaultData, next: VaultCategory, oldId?: st
   if (!desired || desired.length > 70) throw new Error('Ungültiger Kategoriename.');
   const duplicate = registry.some(item => categoryKey(item.name) === categoryKey(desired) && item.id !== oldId);
   if (duplicate) throw new Error('Eine Kategorie mit diesem Namen existiert bereits.');
+  if (next.parentId) {
+    const index = new Map(registry.map(category => [category.id, category]));
+    const visited = new Set<string>();
+    let cursor: string | undefined = next.parentId;
+    const targetId = oldId ?? next.id;
+    while (cursor) {
+      if (cursor === targetId || visited.has(cursor)) throw new Error('Ordner darf nicht sein eigener Unterordner sein.');
+      visited.add(cursor);
+      const parent: VaultCategory | undefined = index.get(cursor);
+      if (!parent) throw new Error('Übergeordneter Ordner nicht vorhanden.');
+      cursor = parent.parentId;
+    }
+  }
   if (!oldId) return { ...vault, categories: [...registry, { ...next, name: desired }] };
   const original = registry.find(item => item.id === oldId);
   if (!original) throw new Error('Kategorie wurde nicht gefunden.');
@@ -76,10 +89,34 @@ export function removeCategory(vault: VaultData, id: string): VaultData {
   if (!selected) return vault;
   return {
     ...vault,
-    categories: registry.filter(item => item.id !== id),
+    categories: registry.filter(item => item.id !== id).map(item => item.parentId === id ? {...item, parentId:selected.parentId} : item),
     entries: vault.entries.map(entry => ({
       ...entry,
       categories: entry.categories.filter(name => categoryKey(name) !== categoryKey(selected.name))
     }))
   };
+}
+
+/** Includes all descendants of a selected category without altering assignments. */
+export function categoryAndDescendants(categories: VaultCategory[], name: string): Set<string> {
+  const index = new Map(categories.map(item => [item.id,item]));
+  const selected = categories.find(category => categoryKey(category.name) === categoryKey(name));
+  const result = new Set<string>([categoryKey(name)]);
+  if (!selected) return result;
+  const children = new Map<string,string[]>();
+  for (const item of categories) {
+    if (!item.parentId) continue;
+    children.set(item.parentId,[...(children.get(item.parentId)??[]),item.id]);
+  }
+  const visited = new Set<string>();
+  const queue = [selected.id];
+  while(queue.length) {
+    const id = queue.shift()!;
+    if(visited.has(id)) continue;
+    visited.add(id);
+    const item = index.get(id);
+    if(item) result.add(categoryKey(item.name));
+    queue.push(...(children.get(id)??[]));
+  }
+  return result;
 }
