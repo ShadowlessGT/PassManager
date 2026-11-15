@@ -70,7 +70,7 @@ export default function ImportPanel({ existing, onClose, onImport }: Props) {
         entries: mapped.entries,
         skipped: mapped.skippedRows,
         headers: mapped.schema.flatMap(table => table.columns),
-        source: 'Password Safe (.db / SQLCipher 4)'
+        source: `Password Safe (.db / ${decrypted.format})`
       });
       setSourceWarnings(mapped.warnings);
     } catch (reason) {
