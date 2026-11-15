@@ -89,7 +89,8 @@ export type PasswordSafeMapping = {
  * rather than silently presenting the conversion as complete.
  */
 export function mapPasswordSafeDatabase(result: EncryptedPasswordSafeResult): PasswordSafeMapping {
-  if (!result || result.format !== 'sqlcipher-v4' || !Array.isArray(result.tables)) {
+  if (!result || typeof result.format !== 'string' ||
+      !/^sqlcipher-v[234]$/.test(result.format) || !Array.isArray(result.tables)) {
     throw new Error('Nicht unterstütztes oder beschädigtes Datenbankformat.');
   }
   const entries: VaultEntry[] = [];
