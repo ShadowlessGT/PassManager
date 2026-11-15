@@ -1344,7 +1344,7 @@ export default function App() {
               <div className="settings-heading"><div><h2>Über Parola</h2><p>Versionsinformation und Änderungsübersicht</p></div></div>
               <p className="settings-note">App-Version {packageJson.version} · Entwicklungsstand · Offline-first</p>
               <details><summary>Neuigkeiten im Entwicklungsbranch</summary>
-                <p className="settings-note">Sicherheits-Dashboard, erweiterte Statistiken und wiederherstellbarer Papierkorb. Nicht Teil einer veröffentlichten 0.7.5.</p>
+                <p className="settings-note">Sicherheits-Dashboard, Statistik, verschlüsselte Sicherungen, Archiv und Datenmigration. Der direkte Password-Safe-Import und die neuen Sicherheitsfunktionen werden im internen Test geprüft.</p>
               </details>
             </section>
           </div>}
