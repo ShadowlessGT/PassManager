@@ -64,3 +64,25 @@
   .import-source-grid { grid-template-columns: 1fr 1fr; }
   .settings-row > div { flex-basis: 170px; }
 }
+
+
+.legacy-db-import {
+  border: 1px solid #365986;
+  border-radius: 13px;
+  background: #122847;
+  padding: 15px;
+  display: grid;
+  gap: 12px;
+}
+.legacy-db-import > strong { color: #eef5ff; font-size: 14px; }
+.legacy-db-import label { display: grid; gap: 8px; font-size: 13px; font-weight: 650; }
+.legacy-db-import input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #3c6194;
+  border-radius: 11px;
+  background: #0e1d34;
+  color: #eef5ff;
+  padding: 10px 12px;
+  font: inherit;
+}

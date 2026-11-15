@@ -30,6 +30,7 @@ public class MainActivity extends BridgeActivity {
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ParolaBillingPlugin.class);
         registerPlugin(ParolaDocumentExportPlugin.class);
+        registerPlugin(ParolaPasswordSafeDbPlugin.class);
         super.onCreate(savedInstanceState);
 
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
