@@ -51,6 +51,21 @@ describe('Password Safe encrypted SQLCipher database mapper', () => {
     })).toThrow(/Tabellenformat/);
   });
 
+  it.each(['sqlcipher-v2', 'sqlcipher-v3', 'sqlcipher-v4'])(
+    'maps authenticated legacy source format %s', format => {
+      const mapped = mapPasswordSafeDatabase({
+        format,
+        tables: [{ name: 'entries', columns: ['name', 'password'],
+          rows: [{ name: 'Konto aus alter Sicherung', password: 'FAKE_TEST_ONLY' }] }],
+        readRows: 1,
+        omittedBinaryFields: 0
+      });
+      expect(mapped.entries).toHaveLength(1);
+      expect(mapped.entries[0].title).toBe('Konto aus alter Sicherung');
+      expect(mapped.requiresPartialImportConfirmation).toBe(false);
+    }
+  );
+
   it('refuses unsupported SQLCipher version', () => {
     expect(() => mapPasswordSafeDatabase({
       format:'sqlite',tables:[],readRows:0,omittedBinaryFields:0
