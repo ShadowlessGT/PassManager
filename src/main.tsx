@@ -5,6 +5,7 @@ import './styles.css';
 import './migrationSecurity.css';
 import './parolaFeatures.css';
 import './ota.css';
+import './lightThemeContrast.css';
 import { loadPreferences } from './preferences';
 import { applyLanguage } from './i18n';
 import { resolveAppearance, applyResolvedAppearance } from './theme';
