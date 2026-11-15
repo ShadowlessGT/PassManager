@@ -24,6 +24,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.zetetic.database.sqlcipher.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteConnection;
+import net.zetetic.database.sqlcipher.SQLiteDatabaseHook;
 
 /**
  * Read-only importer for passwordsafe.app SQLCipher 4 .db backups.
@@ -86,18 +88,32 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
                 }
                 out.getFD().sync();
             }
-            // SQLCipher defaults to 4096-byte pages and a random 16-byte salt.
-            // This is a format check only: the password is verified by SQLCipher.
-            if (total < 4096 || total % 4096 != 0) {
-                throw new IllegalArgumentException("Die Datei ist keine unterstützte SQLCipher-4-Datenbank.");
+            // Do NOT reject by file length modulo 4096. SQLCipher page size,
+            // format revision and the backing document provider can vary.
+            // Let SQLCipher authenticate the pages with the user's password.
+            if (total < 1024) {
+                throw new IllegalArgumentException("Die ausgewählte Datenbank ist leer oder unvollständig.");
             }
-            db = SQLiteDatabase.openOrCreateDatabase(temp, password, null, null, null);
-            // Check HMAC / page integrity before ever querying tables.
-            try (Cursor c = db.rawQuery("SELECT count(*) FROM sqlite_master", null)) {
-                if (!c.moveToFirst()) throw new IllegalArgumentException("Datenbank nicht lesbar.");
+            int version = 0;
+            // Older Password Safe backups may use SQLCipher 3 or 2 defaults.
+            // Each attempt is read-only and verifies the decrypted schema.
+            for (int compatibility : new int[] {4, 3, 2}) {
+                try {
+                    db = openReadOnly(temp, password, compatibility);
+                    version = compatibility;
+                    break;
+                } catch (Exception unsupported) {
+                    // No exception details or password are written to logs.
+                }
             }
-            db.execSQL("PRAGMA query_only = ON");
+            if (db == null) {
+                throw new IllegalArgumentException(
+                    "Datenbank konnte nicht entschlüsselt werden (SQLCipher 4/3/2). " +
+                    "Bitte Master-Passwort und Original-.db-Backup prüfen. " +
+                    "Falls die Original-App die Sicherung öffnen kann, nutze alternativ den CSV-Export.");
+            }
             JSObject payload = exportTables(db);
+            payload.put("format", "sqlcipher-v" + version);
             getActivity().runOnUiThread(() -> call.resolve(payload));
         } catch (Exception ex) {
             // Don't echo exception text: SQL errors can disclose schema or rows.
@@ -110,6 +126,35 @@ public class ParolaPasswordSafeDbPlugin extends Plugin {
             if (temp != null && temp.exists()) {
                 try { if (!temp.delete()) temp.deleteOnExit(); } catch (Exception ignored) {}
             }
+        }
+    }
+
+    /**
+     * Authenticate an existing encrypted database without creating or changing it.
+     * The legacy compatibility PRAGMA must run immediately after keying,
+     * before SQLCipher's first schema read.
+     */
+    private SQLiteDatabase openReadOnly(File encrypted, String password, int compatibility) {
+        SQLiteDatabase candidate = null;
+        SQLiteDatabaseHook hook = compatibility == 4 ? null : new SQLiteDatabaseHook() {
+            @Override public void preKey(SQLiteConnection connection) { }
+            @Override public void postKey(SQLiteConnection connection) {
+                connection.executeRaw("PRAGMA cipher_compatibility = " + compatibility, null, null);
+            }
+        };
+        try {
+            candidate = SQLiteDatabase.openDatabase(
+                encrypted.getAbsolutePath(), password, null, SQLiteDatabase.OPEN_READONLY, hook);
+            try (Cursor check = candidate.rawQuery("SELECT count(*) FROM sqlite_master", null)) {
+                if (!check.moveToFirst()) throw new IllegalArgumentException("Datenbankstruktur nicht lesbar.");
+            }
+            candidate.execSQL("PRAGMA query_only = ON");
+            return candidate;
+        } catch (Exception failed) {
+            if (candidate != null) {
+                try { candidate.close(); } catch (Exception ignored) { }
+            }
+            throw failed;
         }
     }
 
