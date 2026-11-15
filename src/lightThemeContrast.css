@@ -1,0 +1,83 @@
+/*
+ * PAROLA light-theme contrast fixes.
+ * Loaded last: overrides hard-coded dark surfaces from older feature styles
+ * without changing the intentional dark appearance.
+ */
+
+/* Native Android/WebView select widgets must use a matching foreground,
+   background AND platform color-scheme. This also applies to the option popup. */
+html[data-theme="light"] select,
+html[data-theme="light"] select option,
+html[data-theme="light"] select optgroup {
+  color: #173355;
+  background-color: #f7faff;
+  border-color: #a5bee6;
+  color-scheme: light;
+}
+html[data-theme="light"] :is(.language-select, .gate-language-picker select) {
+  background: #f7faff;
+  color: #173355;
+  border: 1px solid #91b3de;
+  color-scheme: light;
+  -webkit-text-fill-color: #173355;
+}
+html[data-theme="light"] :is(.language-select, .gate-language-picker select) option {
+  background: #ffffff;
+  color: #173355;
+  -webkit-text-fill-color: #173355;
+}
+html[data-theme="dark"] :is(.language-select, .gate-language-picker select) {
+  background: #1e3251;
+  color: #f4f7ff;
+  color-scheme: dark;
+}
+html[data-theme="dark"] select option {
+  background: #172c4b;
+  color: #f4f7ff;
+}
+
+/* The native database importer previously retained a dark blue surface,
+   while light theme switched the inherited foreground to dark blue. */
+html[data-theme="light"] .legacy-db-import {
+  background: #edf5ff;
+  border-color: #b7cce8;
+  color: #203a5b;
+}
+html[data-theme="light"] .legacy-db-import > strong {
+  color: #183658;
+}
+html[data-theme="light"] :is(.legacy-db-import p, .legacy-db-import .settings-note,
+                             .legacy-db-import label) {
+  color: #355575;
+}
+html[data-theme="light"] .legacy-db-import input:not([type="checkbox"]) {
+  background: #ffffff;
+  color: #173355;
+  border-color: #91b3de;
+}
+html[data-theme="light"] .legacy-db-import input::placeholder {
+  color: #637a94;
+}
+
+/* Also cover the related import cards, category choices and security widgets. */
+html[data-theme="light"] .import-source {
+  background: #f2f7ff;
+  color: #244465;
+  border-color: #b8cee7;
+}
+html[data-theme="light"] :is(.import-source.active, .import-source[aria-pressed="true"]) {
+  background: #dcecff;
+  color: #163f78;
+  border-color: #3479cf;
+  box-shadow: inset 0 0 0 1px #3479cf;
+}
+html[data-theme="light"] .import-drop small { color: #4d6685; }
+html[data-theme="light"] .security-bar-col { color: #355574; }
+html[data-theme="light"] .security-recommendation > span:last-child { color: #116c59; }
+html[data-theme="light"] .security-danger-options label { color: #273e5c; }
+html[data-theme="light"] .security-danger-options select {
+  color: #173355;
+  background: #f7faff;
+  border-color: #a5bee6;
+  color-scheme: light;
+}
