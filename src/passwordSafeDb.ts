@@ -106,6 +106,7 @@ export type PasswordSafeMapping = {
   sourceSession?: string;
   imageRefsByEntryId?: Record<string, string[]>;
   imageCount?: number;
+  sourceIconCount?: number;
   sourceCategoryCount?: number;
   sourceHistoryCount?: number;
   sourceCategories?: Array<{ name: string; color: string }>;

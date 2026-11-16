@@ -13,6 +13,7 @@ export type PasswordSafeRelationalResult = {
     modifiedAt: string;
     favorite: boolean;
     archived: boolean;
+    iconIdentifier: string;
     fields: Array<{
       label: string;
       standardKey: string;
@@ -26,6 +27,7 @@ export type PasswordSafeRelationalResult = {
   }>;
   imageCount: number;
   totalImageBytes: number;
+  sourceIconCount: number;
   categoryCount: number;
   historyCount: number;
   sourceCategories: Array<{ name: string; color: string }>;
@@ -43,6 +45,7 @@ export type RelationalImportMapping = {
   sourceSession: string;
   imageRefsByEntryId: Record<string, string[]>;
   imageCount: number;
+  sourceIconCount: number;
   sourceCategoryCount: number;
   sourceHistoryCount: number;
   sourceCategories: Array<{ name: string; color: string }>;
@@ -98,6 +101,7 @@ export function mapPasswordSafeRelational(source: PasswordSafeRelationalResult):
   const warnings: string[] = [];
   const seenSourceIds = new Set<string>();
   let countedImages = 0;
+  let countedIcons = 0;
   let countedHistory = 0;
   for (const raw of source.entries) {
     if (!raw || typeof raw.sourceId !== 'string' || seenSourceIds.has(raw.sourceId) ||
@@ -112,6 +116,14 @@ export function mapPasswordSafeRelational(source: PasswordSafeRelationalResult):
     entry.title = raw.title.trim();
     if (!entry.title) throw new Error('Ein Quelleintrag hat keinen Namen; Import abgebrochen.');
     entry.favorite = raw.favorite === true;
+    if (typeof raw.iconIdentifier !== 'string' ||
+        (raw.iconIdentifier.length > 0 && !/^[a-z0-9_-]{1,64}$/i.test(raw.iconIdentifier))) {
+      throw new Error('Ungültige Icon-Zuordnung in der Quelle.');
+    }
+    if (raw.iconIdentifier) {
+      entry.icon = raw.iconIdentifier.toLowerCase();
+      countedIcons++;
+    }
     if (raw.archived) entry.lifecycle = { state: 'archived', changedAt: Date.now() };
     entry.createdAt = sourceTimestamp(raw.createdAt) ?? entry.createdAt;
     entry.updatedAt = sourceTimestamp(raw.modifiedAt) ?? entry.updatedAt;
@@ -173,6 +185,9 @@ export function mapPasswordSafeRelational(source: PasswordSafeRelationalResult):
     countedHistory += raw.history.length;
     entries.push(entry);
   }
+  if (countedIcons !== source.sourceIconCount) {
+    throw new Error('Nicht alle Eintragssymbole wurden erkannt. Import abgebrochen.');
+  }
   if (countedImages !== source.imageCount) {
     throw new Error('Nicht alle Quellbilder wurden erkannt. Import vor dem Speichern abgebrochen.');
   }
@@ -194,6 +209,7 @@ export function mapPasswordSafeRelational(source: PasswordSafeRelationalResult):
     sourceSession: source.session,
     imageRefsByEntryId,
     imageCount: source.imageCount,
+    sourceIconCount: source.sourceIconCount,
     sourceCategoryCount: source.categoryCount,
     sourceHistoryCount: source.historyCount,
     sourceCategories: (source.sourceCategories ?? []).filter(item =>

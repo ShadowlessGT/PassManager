@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { VaultEntry } from './types';
+import { EntryIcon } from './entryIcons';
 
 /** Never use third-party icon aggregation services. Direct HTTPS request is
  * opt-in only, no referrer, and never to local or numeric hostnames. */
@@ -21,7 +22,8 @@ export default function EntryAvatar({ item, allowRemote }: { item: VaultEntry; a
   const name = item.title.trim();
   const fallback = name ? name.slice(0,2).toUpperCase() : 'P';
   return <span className="entry-avatar">
-    {item.images[0] ? <img src={item.images[0]} alt="" /> :
+    {item.icon ? <EntryIcon id={item.icon} /> :
+      item.images[0] ? <img src={item.images[0]} alt="" /> :
       source && failed!==source ? <img src={source} referrerPolicy="no-referrer" alt=""
         onError={()=>setFailed(source)} loading="lazy" /> : fallback}
   </span>;
