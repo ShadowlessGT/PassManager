@@ -24,6 +24,7 @@ import { checkPlayLicenseServer } from './playBilling';
 import { freeEntryEditError } from './featureGate';
 import InsightsPanel from './InsightsPanel';
 import ArchivePanel from './ArchivePanel';
+import AutofillCapturePanel from './AutofillCapturePanel';
 import EntryAvatar from './EntryAvatar';
 import { entriesAt, moveEntry, eraseTrashedEntry } from './vaultLifecycle';
 import packageJson from '../package.json';
@@ -1042,7 +1043,8 @@ export default function App() {
             {!simple && <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> Aus Bild erkennen</button>}
           </div>}
 
-          {tab === 'vault' && securitySummary && <button className="security-digest" type="button" onClick={()=>setTab('insights')}>
+          {tab === 'vault' && <AutofillCapturePanel vault={data} onSave={saveEntry} compact/>}
+          {tab === 'vault' && securitySummary && <button className="security-digest"  type="button" onClick={()=>setTab('insights')}>
             <ShieldCheck size={21}/>
             <span><strong>Sicherheitscenter</strong><small>{securitySummary.score===null?'Noch keine Passwörter':
               securitySummary.score+'/100 · '+securitySummary.recommendations.length+' Empfehlungen'} · Lokal geprüft</small></span>
@@ -1107,6 +1109,7 @@ export default function App() {
           </>}
 
           {tab === 'settings' && <div className="settings-layout">
+            <AutofillCapturePanel vault={data} onSave={saveEntry}/>
             <section className="settings-card language-card">
               <div className="settings-heading">
                 <span className="settings-icon"><Globe2 size={22}/></span>
