@@ -7,9 +7,10 @@ import { generateStrongPassword } from './passwordGenerator';
 import CategoryPicker from './CategoryPicker';
 import type { VaultCategory } from './types';
 
-export default function QuickAdd({ onClose, onSave, onAdvanced, categories, initialCategories = [], simple = false }: {
+export default function QuickAdd({ onClose, onSave, onCreateCategory, onAdvanced, categories, initialCategories = [], simple = false }: {
   onClose: () => void;
   onSave: (entry: VaultEntry) => Promise<void>;
+  onCreateCategory: (name: string) => Promise<string>;
   onAdvanced: (entry: VaultEntry) => void;
   categories: VaultCategory[];
   initialCategories?: string[];
@@ -55,7 +56,7 @@ export default function QuickAdd({ onClose, onSave, onAdvanced, categories, init
           onClick={() => setShowCategories(current => !current)}>
           {showCategories ? 'Kategorien ausblenden' : selectedCategories.length ? 'Kategorie ändern' : 'Kategorie zuordnen (freiwillig)'}
         </button>}
-        {(!simple || showCategories) && <CategoryPicker compact available={categories} selected={selectedCategories} onChange={setSelectedCategories}/>}
+        {(!simple || showCategories) && <CategoryPicker compact available={categories} selected={selectedCategories} onCreate={onCreateCategory} onChange={setSelectedCategories}/>}
         {error && <p className="error-box" role="alert">{error}</p>}
         <div className="sheet-actions">{!simple && <button type="button" className="secondary-btn" onClick={() => { onAdvanced(entry()); onClose(); }}><Pencil size={16}/> Mehr Felder</button>}<button type="submit" className="primary-btn" disabled={busy}><Check size={18}/> {simple ? 'Passwort speichern' : 'Sicher speichern'}</button></div>
       </form>

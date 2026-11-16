@@ -27,6 +27,7 @@ import ArchivePanel from './ArchivePanel';
 import AutofillCapturePanel from './AutofillCapturePanel';
 import EntryAvatar from './EntryAvatar';
 import { EntryIcon, ENTRY_ICON_CHOICES } from './entryIcons';
+import './entryEditorUX.css';
 import { shouldAutomaticallyPromptDeviceUnlock } from './automaticDeviceUnlock';
 import { entriesAt, moveEntry, eraseTrashedEntry } from './vaultLifecycle';
 import packageJson from '../package.json';
@@ -43,7 +44,7 @@ import { logActivity, trackPasswordHistory } from './insights';
 import { App as NativeApp } from '@capacitor/app';
 import CategoryPicker from './CategoryPicker';
 import CategoryManager from './CategoryManager';
-import { categoriesForVault, ensureEntryCategories, upsertCategory, removeCategory, categoryAndDescendants, categoryKey } from './categories';
+import { categoriesForVault, createCategoryForEntry, ensureEntryCategories, upsertCategory, removeCategory, categoryAndDescendants, categoryKey } from './categories';
 import { loadPreferences, savePreferences, shouldLockAfterBackground, shouldLockAfterIdle, LOCK_OPTIONS, IDLE_OPTIONS } from './preferences';
 import type { UserPreferences } from './preferences';
 import { resolveAppearance, applyResolvedAppearance, APPEARANCE_CHOICES } from './theme';
@@ -105,15 +106,18 @@ type EditorProps = {
   ultra: boolean;
   onClose: () => void;
   onSave: (entry: VaultEntry) => Promise<void>;
+  onCreateCategory: (name: string) => Promise<string>;
 };
 
-function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave }: EditorProps) {
+function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave, onCreateCategory }: EditorProps) {
   const t = useTranslate();
   const [draft, setDraft] = useState<VaultEntry>({ ...entry, images: [...entry.images], categories: [...entry.categories], fields: (entry.fields ?? []).map(field => ({...field})) });
   const [tagsText,setTagsText] = useState((entry.tags??[]).join(', '));
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showImageUpgrade, setShowImageUpgrade] = useState(false);
+  const topImageInput = useRef<HTMLInputElement>(null);
 
   function update<K extends keyof VaultEntry>(key: K, value: VaultEntry[K]) {
     setDraft(previous => ({ ...previous, [key]: value }));
@@ -193,6 +197,29 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
           <button className="icon-btn" type="button" onClick={onClose} aria-label="Schließen"><X size={20}/></button>
         </header>
         <form className="editor-form" onSubmit={submit}>
+          <section className="entry-photo-first" aria-label="Bilder dieses Eintrags">
+            <div className="entry-photo-first-heading">
+              <strong><ImagePlus size={19} aria-hidden="true"/> Bilder</strong>
+              <small>{draft.images.length} / 12</small>
+            </div>
+            <div className="entry-photo-first-tiles">
+              {draft.images.map((image, index) => <div className="entry-photo-first-thumbnail" key={index}>
+                <img src={image} alt={'Gespeichertes Bild ' + (index + 1)}/>
+                <button type="button" aria-label={'Bild ' + (index + 1) + ' entfernen'}
+                  onClick={() => update('images', draft.images.filter((_,i) => i !== index))}><X size={16}/></button>
+              </div>)}
+              {draft.images.length < 12 && <button type="button"
+                className={'entry-photo-first-add' + (!ultra ? ' locked' : '')}
+                aria-label={ultra ? 'Bild hinzufügen' : 'Bilder mit Parola Ultra freischalten'}
+                disabled={saving}
+                onClick={() => ultra ? topImageInput.current?.click() : setShowImageUpgrade(previous => !previous)}>
+                {ultra ? <Plus size={27} aria-hidden="true"/> : <LockKeyhole size={24} aria-hidden="true"/>}
+                <span>{ultra ? 'Bild hinzufügen' : 'Bilder · Ultra'}</span>
+              </button>}
+            </div>
+            <input ref={topImageInput} type="file" hidden multiple accept="image/jpeg,image/png,image/webp"
+              aria-label="Bilder für den Eintrag auswählen" onChange={addImages}/>
+          </section>
           <div className="form-section-title">Grundinformationen</div>
           <label>Name <span className="required">*</span><input autoFocus value={draft.title} onChange={e => update('title', e.target.value)} placeholder="z. B. Netflix, Gmail, WLAN..." maxLength={120}/></label>
           {!simple && ultra && <label>Beschreibung<input value={draft.description} onChange={e => update('description', e.target.value)} placeholder="Wofür wird dieser Zugang verwendet?"/></label>}
@@ -255,17 +282,27 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
                onChange={event=>setTagsText(event.target.value)}
                placeholder="z. B. Arbeit, Banking, Wichtig"/>
            </label>
-           <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
-          <label>Symbol für diesen Eintrag
-            <select aria-label="Eintragssymbol auswählen" value={draft.icon ?? ''}
-              onChange={event => update('icon', event.target.value || undefined)}>
-              <option value="">Standard-Symbol</option>
-              {ENTRY_ICON_CHOICES.map(choice =>
-                <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+           <CategoryPicker available={categories} selected={draft.categories} onCreate={onCreateCategory}
+              onChange={names => update('categories',names)} compact={simple}/>
+          <div className="entry-icon-selector">
+            <strong className="field-label">Symbol für diesen Eintrag</strong>
+            <div className="entry-icon-choices" role="group" aria-label="Eintragssymbol auswählen">
+              <button type="button" className={!draft.icon ? 'selected' : ''} aria-pressed={!draft.icon}
+                onClick={() => update('icon',undefined)} title="Standard-Symbol">
+                <KeyRound size={24} aria-hidden="true"/><span>Standard</span>
+              </button>
+              {ENTRY_ICON_CHOICES.map(choice => <button type="button" key={choice.id}
+                className={draft.icon===choice.id ? 'selected' : ''} aria-pressed={draft.icon===choice.id}
+                onClick={() => update('icon',choice.id)} title={choice.label}>
+                <EntryIcon id={choice.id} size={24}/><span>{choice.label}</span>
+              </button>)}
               {draft.icon && !ENTRY_ICON_CHOICES.some(choice => choice.id === draft.icon) &&
-                <option value={draft.icon}>Quell-Symbol: {draft.icon}</option>}
-            </select>
-          </label>
+                <button type="button" className="selected" aria-pressed="true"
+                  title={'Importiertes Quell-Symbol ' + draft.icon}>
+                  <EntryIcon id={draft.icon} size={24}/><span>Importiertes Symbol</span>
+                </button>}
+            </div>
+          </div>
           {!simple && ultra && <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>}
           <>
           <div className="form-section-title">Bilder und Anhänge</div>
@@ -284,6 +321,18 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
             <button type="submit" className="primary-btn" disabled={saving}>{saving ? 'Wird verschlüsselt...' : 'Sicher speichern'} <Check size={17}/></button>
           </div>
         </form>
+        {!ultra && showImageUpgrade && <div className="entry-photo-upgrade-overlay" role="presentation"
+          onMouseDown={event => { if(event.target===event.currentTarget) setShowImageUpgrade(false); }}>
+          <section className="entry-photo-upgrade-modal" role="dialog" aria-modal="true" aria-label="Parola Ultra freischalten">
+            <div className="entry-photo-upgrade-heading">
+              <strong>Bilder hinzufügen mit Parola Ultra</strong>
+              <button type="button" autoFocus className="icon-btn compact" aria-label="Ultra-Angebot schließen"
+                onClick={() => setShowImageUpgrade(false)}><X size={18}/></button>
+            </div>
+            <p>Mit Parola Ultra kannst du Bilder direkt zu diesem Eintrag hinzufügen. Bereits vorhandene Bilder bleiben erhalten.</p>
+            <LicensePanel purchaseOnly/>
+          </section>
+        </div>}
       </section>
     </div>
   );
@@ -644,6 +693,16 @@ export default function App() {
   async function saveCategory(category: VaultCategory, oldId?: string) {
     await mutateVault(current => upsertCategory(current, category, oldId));
     setNotice(oldId ? 'Kategorie aktualisiert' : 'Kategorie erstellt');
+  }
+  async function createCategoryFromEntry(name: string): Promise<string> {
+    let savedName = name.trim();
+    await mutateVault(current => {
+      const result = createCategoryForEntry(current, savedName);
+      savedName = result.name;
+      return result.vault;
+    });
+    setNotice('Kategorie "' + savedName + '" erstellt');
+    return savedName;
   }
   async function deleteCategory(id: string) {
     await mutateVault(current => removeCategory(current, id));
@@ -1138,7 +1197,9 @@ export default function App() {
                 <article className="entry-card" key={item.id}>
                   <button className="entry-open" onClick={() => openEntry(item.id)} aria-label={item.title + ' öffnen'}>
                     <EntryAvatar item={item} allowRemote={preferences.websiteIconsEnabled}/>
-                    <span className="entry-text"><strong>{item.title}</strong><small>{item.email || item.username || item.description || (simple ? 'Zum Öffnen antippen' : 'Sicherer Eintrag')}</small>
+                    <span className="entry-text"><strong className="entry-name-with-icon">{item.icon &&
+                        <span className="entry-name-icon" aria-hidden="true"><EntryIcon id={item.icon} size={18}/></span>}
+                      <span className="entry-name-label">{item.title}</span></strong><small>{item.email || item.username || item.description || (simple ? 'Zum Öffnen antippen' : 'Sicherer Eintrag')}</small>
                       <span className="mini-tags">{item.person && <em>{item.person}</em>}{item.categories.slice(0, 2).map(category => <em key={category}>{category}</em>)}{(item.tags??[]).slice(0,2).map(tag=><em key={tag}>#{tag}</em>)}</span></span>
                   </button>
                   <div className="entry-actions">
@@ -1408,8 +1469,8 @@ export default function App() {
       {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
           <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
-          <div className="detail-top"><div className="detail-avatar">{selected.icon ? <EntryIcon id={selected.icon} size={34}/> :
-              selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
+          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> :
+              selected.icon ? <EntryIcon id={selected.icon} size={34}/> : getInitials(selected.title)}</div><h2 className="detail-entry-name">{selected.icon && <EntryIcon id={selected.icon} size={22}/>}<span>{selected.title}</span></h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
           <div className="detail-fields">
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
@@ -1496,9 +1557,11 @@ export default function App() {
           </form>
         </section>
       </div>}
-      {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} simple={simple} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry} onAdvanced={setEditing}/>}
+      {showQuickAdd && <QuickAdd key={categoryFilter ?? 'all'} categories={categories} simple={simple} initialCategories={categoryFilter ? [categoryFilter] : []} onClose={() => setShowQuickAdd(false)} onSave={saveEntry}
+        onCreateCategory={createCategoryFromEntry} onAdvanced={setEditing}/>}
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
-      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} ultra={ultra} onClose={() => setEditing(null)} onSave={saveEntry}/>}
+      {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} ultra={ultra} onClose={() => setEditing(null)} onSave={saveEntry}
+        onCreateCategory={createCategoryFromEntry}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>
   );

@@ -24,6 +24,20 @@ export function makeCategory(name: string, icon = 'folder', color: string = CATE
   };
 }
 
+/**
+ * Create a category independently of an entry. Its persistence must not
+ * depend on the user later saving the entry editor.
+ */
+export function createCategoryForEntry(vault: VaultData, name: string): { vault: VaultData; name: string } {
+  const candidate = name.trim();
+  if (!candidate || candidate.length > 70)
+    throw new Error('Kategorie benötigt einen Namen mit höchstens 70 Zeichen.');
+  const match = categoriesForVault(vault).find(item => categoryKey(item.name) === categoryKey(candidate));
+  if (match) return { vault, name: match.name };
+  const category = makeCategory(candidate);
+  return { vault: upsertCategory(vault, category), name: category.name };
+}
+
 // Old vaults only stored category strings on entries. Keep their names and
 // assignments, and transparently present those as regular categories.
 export function categoriesForVault(vault: VaultData): VaultCategory[] {
