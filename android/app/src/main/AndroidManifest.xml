@@ -25,6 +25,20 @@
 
         </activity>
 
+        <!-- Explicit user-selected Android Autofill provider. This service only
+             requests save consent; it never returns credentials to another app. -->
+        <service
+            android:name=".ParolaAutofillCaptureService"
+            android:label="Parola – Login speichern"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data android:name="android.autofill"
+                android:resource="@xml/parola_autofill" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

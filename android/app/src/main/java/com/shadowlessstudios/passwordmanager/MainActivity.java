@@ -31,6 +31,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ParolaBillingPlugin.class);
         registerPlugin(ParolaDocumentExportPlugin.class);
         registerPlugin(ParolaPasswordSafeDbPlugin.class);
+        registerPlugin(ParolaAutofillPlugin.class);
         super.onCreate(savedInstanceState);
 
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);

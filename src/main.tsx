@@ -4,6 +4,7 @@ import { preparePrivacyScreen } from './device';
 import './styles.css';
 import './migrationSecurity.css';
 import './parolaFeatures.css';
+import './autofillCapture.css';
 import './ota.css';
 import './lightThemeContrast.css';
 import { loadPreferences } from './preferences';
