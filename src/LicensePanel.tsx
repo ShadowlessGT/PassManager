@@ -6,7 +6,7 @@ import { adminCreateCodes, isAdmin, lookupLicense, redeemGiftCode } from './lice
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getApp } from 'firebase/app';
 
-export default function LicensePanel({ compact = false }: { compact?: boolean }) {
+export default function LicensePanel({ compact = false, purchaseOnly = false }: { compact?: boolean; purchaseOnly?: boolean }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -75,10 +75,11 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
 
   if (!cloudConfigured) return compact ? null : <p className="settings-note">Freischaltungen sind vorbereitet, aber Firebase ist noch nicht konfiguriert.</p>;
 
-  return <section className={compact ? 'license-compact' : 'settings-card'}>
+  return <section className={compact ? 'license-compact' : purchaseOnly ? 'license-purchase-inline' : 'settings-card'}>
     <div className="settings-heading"><span className="settings-icon"><Gift size={21}/></span><div>
-      <h2>{compact ? 'Freischaltcode vorhanden?' : 'Parola Ultra & Freischaltcodes'}</h2>
-      <p>Kostenlose Geschenkcodes mit Firebase-Konto einlösen.</p>
+      <h2>{compact ? 'Freischaltcode vorhanden?' : purchaseOnly ? 'Bilder mit Parola Ultra freischalten' : 'Parola Ultra & Freischaltcodes'}</h2>
+      <p>{purchaseOnly ? 'Einmalig über Google Play freischalten oder einen vorhandenen Geschenkcode einlösen.' :
+        'Kostenlose Geschenkcodes mit Firebase-Konto einlösen.'}</p>
     </div></div>
     {!compact && <PlayBillingPanel loggedIn={loggedIn} alreadyUltra={licenseActive}/>}
     {!loggedIn ? <div className="cloud-login">
@@ -91,7 +92,7 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
     </div> : <>
       <p className="settings-note"><ShieldCheck size={15}/> {info || 'Lizenz wird geprüft'}</p>
       <div className="code-entry"><input aria-label="Freischaltcode" placeholder="PM-..." maxLength={48} autoComplete="off" value={code} onChange={e => setCode(e.target.value)}/><button className="primary-btn" type="button" disabled={busy || !code.trim()} onClick={() => void redeem()}>Einlösen</button></div>
-      {admin && !compact && <div className="admin-code-panel">
+      {admin && !compact && !purchaseOnly && <div className="admin-code-panel">
         <h3>Admin · kostenlose Freischaltcodes</h3>
         <p className="settings-note">Einmalcodes, für 30 Tage einlösbar. 0 Tage Laufzeit ergibt Lifetime.</p>
         <div className="admin-controls">
@@ -103,6 +104,6 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
       </div>}
     </>}
     {status && <p role="status" className="settings-note">{status}</p>}
-    {!compact && <p className="settings-note">Rabatte und kostenpflichtige Käufe gehören in Google Play Billing. Firebase-Geschenkcodes sind kein Zahlungsweg. Käufe werden serverseitig durch Google Play verifiziert; Geschenkcodes sind kostenlos und kein Zahlungsmittel.</p>}
+    {!compact && !purchaseOnly && <p className="settings-note">Rabatte und kostenpflichtige Käufe gehören in Google Play Billing. Firebase-Geschenkcodes sind kein Zahlungsweg. Käufe werden serverseitig durch Google Play verifiziert; Geschenkcodes sind kostenlos und kein Zahlungsmittel.</p>}
   </section>;
 }

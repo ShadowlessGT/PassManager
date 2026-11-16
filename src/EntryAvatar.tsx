@@ -22,9 +22,9 @@ export default function EntryAvatar({ item, allowRemote }: { item: VaultEntry; a
   const name = item.title.trim();
   const fallback = name ? name.slice(0,2).toUpperCase() : 'P';
   return <span className="entry-avatar">
-    {item.icon ? <EntryIcon id={item.icon} /> :
-      item.images[0] ? <img src={item.images[0]} alt="" /> :
+    {item.images[0] ? <img src={item.images[0]} alt="" /> :
       source && failed!==source ? <img src={source} referrerPolicy="no-referrer" alt=""
-        onError={()=>setFailed(source)} loading="lazy" /> : fallback}
+        onError={()=>setFailed(source)} loading="lazy" /> :
+      item.icon ? <EntryIcon id={item.icon} /> : fallback}
   </span>;
 }
