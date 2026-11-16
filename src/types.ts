@@ -52,6 +52,9 @@ export type VaultEntry = {
 
 export type VaultCategory = {
   parentId?: string;
+  // Older vaults did not record category dates. Keep timestamps optional.
+  createdAt?: number;
+  updatedAt?: number;
   id: string;
   name: string;
   icon: string;

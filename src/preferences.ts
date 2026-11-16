@@ -1,6 +1,8 @@
 import type { LanguagePreference } from './i18n';
 import { normalizeLanguagePreference } from './i18n';
 import { SNAPSHOT_INTERVALS } from './snapshotPolicy';
+import { isSortMode } from './vaultSorting';
+import type { SortMode } from './vaultSorting';
 
 export type UiMode = 'simple' | 'expert';
 export type Appearance = 'system' | 'light' | 'dark';
@@ -26,6 +28,10 @@ export type UserPreferences = {
   websiteIconsEnabled: boolean;
   copyButtonsVisible: boolean;
   maskLength: boolean;
+  vaultSort: SortMode;
+  categorySort: SortMode;
+  categoryColumns: 1|2|3;
+  vaultExtrasExpanded: boolean;
 };
 
 export const LOCK_OPTIONS = [
@@ -67,7 +73,11 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   highContrast: false,
   websiteIconsEnabled: false,
   copyButtonsVisible: true,
-  maskLength: false
+  maskLength: false,
+  vaultSort: 'newest',
+  categorySort: 'alphabetical',
+  categoryColumns: 2,
+  vaultExtrasExpanded: false
 };
 const PREFERENCE_KEY = 'passmanager.ui-preferences-v1';
 
@@ -101,7 +111,12 @@ export function normalizePreferences(raw: unknown): UserPreferences {
     highContrast: source.highContrast===true,
     websiteIconsEnabled: source.websiteIconsEnabled===true,
     copyButtonsVisible: source.copyButtonsVisible!==false,
-    maskLength: source.maskLength===true
+    maskLength: source.maskLength===true,
+    vaultSort: isSortMode(source.vaultSort) ? source.vaultSort : DEFAULT_PREFERENCES.vaultSort,
+    categorySort: isSortMode(source.categorySort) ? source.categorySort : DEFAULT_PREFERENCES.categorySort,
+    categoryColumns: source.categoryColumns===1||source.categoryColumns===2||source.categoryColumns===3
+      ? source.categoryColumns : DEFAULT_PREFERENCES.categoryColumns,
+    vaultExtrasExpanded: source.vaultExtrasExpanded===true
   };
 }
 export function loadPreferences(): UserPreferences {

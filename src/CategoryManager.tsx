@@ -3,10 +3,16 @@ import type { FormEvent } from 'react';
 import { BriefcaseBusiness, Car, Folder, Gamepad2, GraduationCap, Heart, Home, Plus, ShoppingBag, Trash2, Wallet, Wifi, X, Pencil } from 'lucide-react';
 import type { VaultCategory, VaultEntry } from './types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, makeCategory } from './categories';
+import { SORT_OPTIONS,sortVaultCategories } from './vaultSorting';
+import type {SortMode} from './vaultSorting';
 type Props = {
   categories: VaultCategory[];
   entries: VaultEntry[];
   simple?: boolean;
+  sort:SortMode;
+  columns:1|2|3;
+  onSortChange:(mode:SortMode)=>void;
+  onColumnsChange:(count:1|2|3)=>void;
   onOpen: (name: string) => void;
   onSave: (category: VaultCategory, oldId?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -20,7 +26,8 @@ export function CategoryIcon({category, size=22}:{category:VaultCategory;size?:n
   const Icon = icons[category.icon as keyof typeof icons] || Folder;
   return <Icon size={size}/>;
 }
-export default function CategoryManager({categories, entries, onOpen,onSave,onDelete,simple=false}:Props){
+export default function CategoryManager({categories, entries, onOpen,onSave,onDelete,simple=false,
+  sort,columns,onSortChange,onColumnsChange}:Props){
   const [editing,setEditing] = useState<VaultCategory|null>(null);
   const [newCategory,setNewCategory]=useState(false);
   const [name,setName]=useState('');
@@ -46,7 +53,8 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
   }
   async function save(event:FormEvent){
     event.preventDefault();setError('');setBusy(true);
-    try {await onSave({ ...makeCategory(name,icon,color),id:editing?.id??crypto.randomUUID(),parentId:parentId||undefined },editing?.id);
+    try {await onSave({ ...makeCategory(name,icon,color),id:editing?.id??crypto.randomUUID(),
+        createdAt:editing?.createdAt??Date.now(),parentId:parentId||undefined },editing?.id);
       setEditing(null);setNewCategory(false);
     }catch(reason){setError((reason as Error).message||'Kategorie konnte nicht gespeichert werden.');}
     finally{setBusy(false);}
@@ -60,9 +68,22 @@ export default function CategoryManager({categories, entries, onOpen,onSave,onDe
       <button type="button" aria-pressed={layout==='tiles'} className={layout==='tiles'?'active':''} onClick={()=>setCategoryLayout('tiles')}>Kacheln</button>
       <button type="button" aria-pressed={layout==='list'} className={layout==='list'?'active':''} onClick={()=>setCategoryLayout('list')}>Liste</button>
     </div>
-    <div className={'collection-grid category-layout-'+layout}>
+    <div className="category-view-options">
+      <label className="category-sort-control">Sortierung
+        <select aria-label="Kategorien sortieren" value={sort} onChange={e=>onSortChange(e.target.value as SortMode)}>
+          {SORT_OPTIONS.map(option=><option value={option.value} key={option.value}>{option.label}</option>)}
+        </select>
+      </label>
+      {layout==='tiles' && <fieldset className="category-columns-control">
+        <legend>Spalten</legend>
+        {[1,2,3].map(count=><button type="button" key={count} className={columns===count?'active':''}
+          aria-pressed={columns===count} aria-label={count+' Kategorien nebeneinander'}
+          onClick={()=>onColumnsChange(count as 1|2|3)}>{count}</button>)}
+      </fieldset>}
+    </div>
+    <div className={'collection-grid category-layout-'+layout+' category-cols-'+columns}>
       {categories.length===0 && <div className="empty-state"><Folder size={32}/><h3>Keine Kategorien</h3><p>Erstelle einen Ordner – danach kannst du Einträge hinzufügen.</p></div>}
-      {categories.map(category=>{
+      {sortVaultCategories(categories,entries,sort).map(category=>{
         const count=entries.filter(item=>item.categories.some(name=>name.toLocaleLowerCase('de')===category.name.toLocaleLowerCase('de'))).length;
         return <div className="category-manager-card" key={category.id} style={{backgroundColor:layout==='tiles'?category.color+'25':undefined,borderColor:layout==='tiles'?category.color+'70':undefined}}>
           <button type="button" className="category-view-btn" onClick={()=>onOpen(category.name)} aria-label={'Kategorie '+category.name+' öffnen'}>

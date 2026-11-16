@@ -18,7 +18,9 @@ export function makeCategory(name: string, icon = 'folder', color: string = CATE
     id: crypto.randomUUID(),
     name: normalizedName,
     icon: CATEGORY_ICONS.some(item => item.value === icon) ? icon : 'folder',
-    color: /^#[0-9a-f]{6}$/i.test(color) ? color : CATEGORY_COLORS[0]
+    color: /^#[0-9a-f]{6}$/i.test(color) ? color : CATEGORY_COLORS[0],
+    createdAt: Date.now(),
+    updatedAt: Date.now()
   };
 }
 
@@ -47,7 +49,7 @@ export function categoriesForVault(vault: VaultData): VaultCategory[] {
   for (const entry of vault.entries) {
     for (const name of entry.categories) {
       const key = categoryKey(name);
-      if (key && !found.has(key)) found.set(key, { ...makeCategory(name), id:'legacy-'+encodeURIComponent(key) });
+      if (key && !found.has(key)) found.set(key, { ...makeCategory(name), createdAt:undefined, updatedAt:undefined, id:'legacy-'+encodeURIComponent(key) });
     }
   }
   return [...found.values()].sort((a,b) => a.name.localeCompare(b.name, 'de'));
@@ -90,7 +92,10 @@ export function upsertCategory(vault: VaultData, next: VaultCategory, oldId?: st
   if (!original) throw new Error('Kategorie wurde nicht gefunden.');
   return {
     ...vault,
-    categories: registry.map(item => item.id === oldId ? { ...next, id: oldId, name: desired } : item),
+    categories: registry.map(item => item.id === oldId ? {
+      ...next, id: oldId, name: desired,
+      createdAt: original.createdAt, updatedAt: Date.now()
+    } : item),
     entries: vault.entries.map(entry => ({
       ...entry,
       categories: entry.categories.map(name => categoryKey(name) === categoryKey(original.name) ? desired : name)

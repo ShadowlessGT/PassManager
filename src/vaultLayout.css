@@ -1,0 +1,92 @@
+/* Compact Parola vault and user-configurable category tiles.
+ * UI-only preferences; no changes to encrypted entry values or backup format.
+ */
+.vault-landing .topbar {margin-bottom:18px}
+.vault-landing .section-head {margin-bottom:13px}
+.vault-landing .section-head h1 {margin-bottom:3px}
+.vault-landing .section-head .section-subtitle {margin-top:4px}
+.vault-landing .searchbox {margin-bottom:10px}
+.vault-landing .searchbox input {min-height:0}
+.vault-toolbar {display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:0 0 13px}
+.vault-toolbar button {min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #385683;background:#172941;color:#dceafd;border-radius:11px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.vault-toolbar .vault-security-link {background:#163a39;border-color:#408f7d;color:#c0f2dd}
+.vault-toolbar .vault-security-link strong {color:inherit}
+.vault-toolbar .vault-more-toggle {margin-left:auto}
+.vault-actions-panel {margin-bottom:14px;padding:12px;border:1px solid #385683;border-radius:14px;background:#17243c}
+.vault-actions-panel .quick-action-strip {display:flex;flex-wrap:wrap;gap:8px;margin:0!important}
+.vault-actions-panel .quick-action-strip button {min-width:0;flex:1 1 145px;min-height:44px!important;width:auto!important;padding:10px!important;font-size:12px!important;justify-content:center!important}
+.vault-actions-note {display:flex;align-items:flex-start;gap:7px;color:#b6cbdf;font-size:11px;line-height:1.55;margin:11px 0 0}
+.vault-actions-note svg {flex-shrink:0}
+.vault-list-title {display:flex;flex-wrap:wrap;gap:7px 9px;align-items:center;margin:0 0 11px}
+.vault-sort-control {display:flex;align-items:center;justify-content:flex-end;flex:1 1 155px;margin-left:auto;min-width:125px}
+.vault-sort-control select,.category-sort-control select {width:100%;max-width:245px;min-height:38px;border:1px solid #385683;border-radius:10px;background:#172941;color:#edf5ff;padding:7px 10px;font-size:12px;line-height:1.3}
+.vault-landing .entries-list {gap:9px}
+
+/* The selected number of columns is honored on mobile as well as desktop. */
+.category-manager .category-layout-tiles.category-cols-1 {grid-template-columns:minmax(0,1fr)}
+.category-manager .category-layout-tiles.category-cols-2 {grid-template-columns:repeat(2,minmax(0,1fr))}
+.category-manager .category-layout-tiles.category-cols-3 {grid-template-columns:repeat(3,minmax(0,1fr))}
+.category-manager .category-layout-list {grid-template-columns:minmax(0,1fr)!important}
+.category-view-options {display:flex;align-items:end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.category-sort-control {display:grid;gap:5px;flex:1 1 170px;color:#b7caf0;font-size:12px;font-weight:700}
+.category-sort-control select {max-width:none}
+.category-columns-control {border:0;padding:0;margin:0;display:flex;align-items:center;gap:5px}
+.category-columns-control legend {display:block;font-size:12px;font-weight:700;color:#b7caf0;margin:0 0 5px}
+.category-columns-control button {height:38px;min-width:37px;border:1px solid #385683;border-radius:9px;background:#172941;color:#dceafd;font-size:12px;font-weight:750;cursor:pointer}
+.category-columns-control button.active {background:#2267c0;color:#fff;border-color:#75a8e7}
+.category-manager .category-layout-tiles .category-manager-card {position:relative;min-width:0;min-height:110px;border-radius:15px}
+.category-manager .category-layout-tiles.category-cols-2 .category-manager-card,
+.category-manager .category-layout-tiles.category-cols-3 .category-manager-card {display:flex;flex-direction:column;align-items:stretch;justify-content:space-between}
+.category-manager .category-layout-tiles.category-cols-2 .category-view-btn,
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn {
+  display:flex;flex-direction:column;gap:5px;text-align:left;align-items:flex-start;justify-content:flex-start;
+  width:100%;min-width:0;padding:13px 10px 10px;min-height:0
+}
+.category-manager .category-layout-tiles.category-cols-2 .category-large-icon,
+.category-manager .category-layout-tiles.category-cols-3 .category-large-icon {height:37px;width:37px;border-radius:11px;margin-bottom:3px}
+.category-manager .category-layout-tiles.category-cols-2 .category-large-icon svg,
+.category-manager .category-layout-tiles.category-cols-3 .category-large-icon svg {width:21px;height:21px}
+.category-manager .category-layout-tiles.category-cols-2 .category-view-btn strong,
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn strong {
+  font-size:13px;line-height:1.27;font-weight:750;overflow-wrap:anywhere;word-break:break-word;
+  padding-right:2px;max-width:100%;text-align:left
+}
+.category-manager .category-layout-tiles.category-cols-2 .category-view-btn small,
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn small {
+  font-size:11px;line-height:1.25;margin-top:0;overflow-wrap:anywhere
+}
+.category-manager .category-layout-tiles.category-cols-2 .category-edit-btn,
+.category-manager .category-layout-tiles.category-cols-3 .category-edit-btn {
+  position:absolute;top:5px;right:4px;margin:0;min-width:36px;min-height:36px;width:36px;height:36px;
+  display:grid;place-items:center;opacity:.88;border-radius:9px
+}
+.category-manager .category-layout-tiles.category-cols-2 .category-view-btn {padding-right:18px;min-height:110px}
+.category-manager .category-layout-tiles.category-cols-3 .category-manager-card {min-height:129px}
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn {padding:12px 7px 10px;min-height:122px}
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn strong {font-size:12px;line-height:1.2}
+.category-manager .category-layout-tiles.category-cols-3 .category-view-btn small {font-size:10px}
+.category-manager .category-layout-tiles.category-cols-3 .category-edit-btn {min-width:32px;min-height:32px;width:32px;height:32px}
+.category-manager .category-layout-tiles.category-cols-3 .category-large-icon {width:34px;height:34px}
+.category-manager .category-layout-tiles.category-cols-1 .category-manager-card {min-height:82px}
+.category-manager .category-layout-tiles.category-cols-1 .category-view-btn {min-height:80px}
+.category-manager .category-layout-list .category-manager-card {min-height:70px}
+
+html[data-theme="light"] .vault-toolbar .vault-security-link {background:#e3f3ee;color:#174b41;border-color:#8fcebc}
+html[data-theme="light"] .vault-toolbar .vault-more-toggle,
+html[data-theme="light"] .vault-sort-control select,
+html[data-theme="light"] .category-sort-control select,
+html[data-theme="light"] .category-columns-control button {background:#e9f2ff;color:#234872;border-color:#b5c9e4}
+html[data-theme="light"] .vault-actions-panel {background:#edf4ff;border-color:#bfd1e9}
+html[data-theme="light"] .vault-actions-note {color:#45647c}
+html[data-theme="light"] .category-columns-control button.active {background:#165ac9;border-color:#165ac9;color:#fff}
+html[data-theme="light"] .category-sort-control,
+html[data-theme="light"] .category-columns-control legend {color:#516b8d}
+@media(max-width:430px){
+  .vault-landing .section-head .add-btn {min-width:92px;padding:10px 12px}
+  .vault-toolbar button {padding:7px 9px;font-size:11px}
+  .vault-list-title h2 {font-size:15px}
+  .vault-sort-control {flex-basis:145px}
+  .category-manager .category-layout-tiles {gap:9px}
+  .category-manager .category-layout-tiles.category-cols-3 .category-view-btn strong {font-size:11px}
+  .category-manager .category-layout-tiles.category-cols-3 .category-view-btn small {font-size:10px}
+}
