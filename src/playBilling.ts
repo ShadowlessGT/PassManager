@@ -31,6 +31,15 @@ async function accountHash(): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(uid));
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
+export async function billingReady(): Promise<boolean> {
+  if (!getApps().length || !getAuth(getApp()).currentUser) return false;
+  try {
+    const callable = httpsCallable<Record<string, never>, { ready: boolean }>(functions(), 'billingReadiness');
+    const result = await callable({});
+    return result.data.ready === true;
+  } catch { return false; }
+}
+
 export async function ultraProduct(): Promise<BillingProduct> {
   if (!nativeBillingAvailable) throw new Error('Google Play Billing ist nur in der Android-App verfügbar.');
   return native.getProduct();

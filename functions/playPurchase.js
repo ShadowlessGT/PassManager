@@ -125,5 +125,29 @@ async function refreshPlayEntitlement(uid, db = getFirestore(), api = { readPlay
   }
   return { active, linked: true };
 }
+// Fail closed: never start a real Play checkout before the Cloud Functions
+// runtime service account has confirmed permission to read Google Play
+// purchases. The deliberately fictitious token must never match a real order.
+let readinessCache = { expiresAt: 0, ready: false };
+async function checkBillingReadiness(api) {
+  const live = !api;
+  if (live && Date.now() < readinessCache.expiresAt)
+    return { ready: readinessCache.ready };
+  const source = api || { readPlayPurchase };
+  let ready;
+  try {
+    await source.readPlayPurchase('parola-readiness-no-real-purchase-token-2026');
+    ready = true;
+  } catch (error) {
+    // A not-found/invalid-token error confirms the service passed Play API
+    // authorization. Authentication/authorization failures mean no checkout.
+    if (error?.status === 400 || error?.status === 404) ready = true;
+    else if (error?.status === 401 || error?.status === 403) ready = false;
+    else throw error;
+  }
+  if (live) readinessCache = { ready, expiresAt: Date.now() + 300_000 };
+  return { ready };
+}
+
 module.exports = { PACKAGE, PRODUCT, hash, validatePurchase, verifyPlayPurchase,
-  refreshPlayEntitlement, readPlayPurchase, acknowledge };
+  refreshPlayEntitlement, checkBillingReadiness, readPlayPurchase, acknowledge };

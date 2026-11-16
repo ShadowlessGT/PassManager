@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { HttpsError } = require('firebase-functions/v2/https');
-const { hash, PRODUCT, validatePurchase, verifyPlayPurchase, refreshPlayEntitlement } = require('./playPurchase');
+const { hash, PRODUCT, validatePurchase, verifyPlayPurchase, refreshPlayEntitlement, checkBillingReadiness } = require('./playPurchase');
 const uid = 'test-user';
 const token = 'purchase-token-valid-123456789';
 const response = (state = 'PURCHASED', account = hash(uid)) => ({
@@ -102,4 +102,27 @@ test('verified 404 refund revokes Play grant but network failures do not', async
     readPlayPurchase: async () => { throw Object.assign(new Error('not found'), { status: 404 }); }
   });
   assert.equal(db.snapshot('accessEntitlements/' + uid).exists, false);
+});
+
+
+test('billing readiness denies unavailable Play API permissions', async () => {
+  for (const status of [401, 403]) {
+    const check = await checkBillingReadiness({ readPlayPurchase: async () => {
+      throw Object.assign(new Error('unauthorized'), { status });
+    }});
+    assert.deepEqual(check, { ready: false });
+  }
+});
+test('billing readiness confirms authorized synthetic probe failures', async () => {
+  for (const status of [400, 404]) {
+    const check = await checkBillingReadiness({ readPlayPurchase: async () => {
+      throw Object.assign(new Error('not a real purchase'), { status });
+    }});
+    assert.deepEqual(check, { ready: true });
+  }
+});
+test('billing readiness rejects network/service failures', async () => {
+  await assert.rejects(checkBillingReadiness({ readPlayPurchase: async () => {
+    throw Object.assign(new Error('offline'), { status: 503 });
+  }}), /offline/);
 });

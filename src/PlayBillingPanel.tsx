@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ShoppingBag, RefreshCw } from 'lucide-react';
 import { nativeBillingAvailable, ultraProduct, startUltraPurchase, restoreUltraPurchase,
-  verifyUltraToken, onUltraPurchaseUpdated } from './playBilling';
+  verifyUltraToken, onUltraPurchaseUpdated, billingReady } from './playBilling';
 import type { PlayPurchase } from './playBilling';
 
 const checkoutEnabled = import.meta.env.VITE_PLAY_BILLING_ENABLED === 'true';
 
-export default function PlayBillingPanel({ loggedIn }: { loggedIn: boolean }) {
+export default function PlayBillingPanel({ loggedIn, alreadyUltra }: { loggedIn: boolean; alreadyUltra: boolean }) {
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -17,9 +17,11 @@ export default function PlayBillingPanel({ loggedIn }: { loggedIn: boolean }) {
     setAvailable(false);
     setPrice('');
     if (!loggedIn || !nativeBillingAvailable || !checkoutEnabled) return;
-    void ultraProduct().then(product => {
+    void Promise.all([ultraProduct(), billingReady()]).then(([product, serverReady]) => {
       if (!active) return;
-      setAvailable(true); setPrice(product.price);
+      setPrice(product.price);
+      setAvailable(serverReady);
+      if (!serverReady) setMessage('Google Play ist bereit, aber die serverseitige Kaufprüfung ist noch nicht freigegeben.');
     }).catch(() => {
       if (active) setMessage('Google Play Ultra ist noch nicht verfügbar. Bitte den internen Testtrack prüfen.');
     });
@@ -59,6 +61,7 @@ export default function PlayBillingPanel({ loggedIn }: { loggedIn: boolean }) {
   }, [loggedIn]);
 
   async function buy() {
+    if (alreadyUltra) { setMessage('Parola Ultra ist für dieses Konto bereits aktiviert.'); return; }
     setBusy(true); setMessage('');
     try {
       await startUltraPurchase();
@@ -95,8 +98,9 @@ export default function PlayBillingPanel({ loggedIn }: { loggedIn: boolean }) {
           ? price ? 'Aktuelles Angebot: ' + price + ' · einmalig, kein Abo.' : 'Produktpreis wird über Google Play geladen.'
           : 'Der Google-Play-Kauf wird vorbereitet. Der Kaufbutton bleibt bis zur serverseitigen Freigabe deaktiviert.'}</p>
         <div className="cloud-buttons">
-          <button className="primary-btn" type="button" disabled={!checkoutEnabled || !available || busy}
-            onClick={() => void buy()}>Ultra freischalten{price ? ' · ' + price : ''}</button>
+          <button className="primary-btn" type="button" disabled={!checkoutEnabled || !available || busy || alreadyUltra}
+            onClick={() => void buy()}>{alreadyUltra ? 'Ultra bereits freigeschaltet'
+              : 'Ultra freischalten' + (price ? ' · ' + price : '')}</button>
           <button className="secondary-btn" type="button" disabled={busy}
             onClick={() => void restore()}><RefreshCw size={16}/> Käufe wiederherstellen</button>
         </div>

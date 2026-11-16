@@ -270,8 +270,9 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
           <p className="input-help">Bilder werden mit dem Tresor verschlüsselt. Maximal 12 Bilder bis 5 MB pro Bild; große Bilder vergrößern Sicherungen.</p>
           <div className="image-gallery">
             {draft.images.map((src, index) => <div className="image-tile" key={index}><img src={src} alt={'Anhang ' + (index + 1)}/><button type="button" aria-label="Bild entfernen" onClick={() => update('images', draft.images.filter((_, i) => i !== index))}><X size={14}/></button></div>)}
-            {draft.images.length < 12 && <label className="image-picker"><ImagePlus size={25}/><span>Bild hinzufügen</span><input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={addImages}/></label>}
+            {ultra && draft.images.length < 12 && <label className="image-picker"><ImagePlus size={25}/><span>Bild hinzufügen</span><input type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={addImages}/></label>}
           </div>
+          {!ultra && <p className="input-help">Bilder und Anhänge hinzufügen gibt es in Parola Ultra. Bereits importierte Bilder bleiben sichtbar und können entfernt werden.</p>}
           </>
           {!simple && ultra && <label className="check-line"><input type="checkbox" checked={draft.favorite} onChange={e => update('favorite', e.target.checked)}/><span>Zu Favoriten hinzufügen</span></label>}
           {simple && <p className="input-help">Tipp: Unter Einstellungen kannst du jederzeit in den Experten-Modus wechseln, um zusätzliche Felder zu bearbeiten.</p>}
@@ -1196,16 +1197,16 @@ export default function App() {
             <section className="settings-card">
               <div className="settings-heading"><div><h2>Parola {ultra ? 'Ultra' : 'Free'}</h2>
               <p>{ultra ? 'Ultra-Funktionen für dieses Firebase-Konto freigeschaltet.' :
-                'Unbegrenzte Zugänge mit Name, E-Mail, Benutzername und Passwort. Erweiterte Felder und Bilder gehören zu Ultra.'}</p></div></div>
-              {!ultra && <p className="settings-note">Google Play Billing wird vorbereitet. Vorhandene Zusatzdaten bleiben erhalten und lesbar.</p>}
+                'Unbegrenzte Zugänge mit Name, E-Mail, Benutzername und Passwort. Neue Bilder und Anhänge sowie erweiterte Felder gehören zu Ultra.'}</p></div></div>
+              {!ultra && <p className="settings-note">Ultra lässt sich über Google Play oder einen Geschenkcode freischalten. Vorhandene Zusatzdaten bleiben erhalten und lesbar.</p>}
             </section>
-            <LicensePanel/>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span><div><h2>Passwörter importieren</h2><p>CSV und Excel (.xlsx) von anderen Passwort-Managern und Tabellen.</p></div></div>
               <p className="settings-note">Import ausschließlich auf diesem Gerät, keine Uploads. Vor dem Speichern werden Dubletten geprüft. Bitte unverschlüsselte Quelldatei nach dem Import sicher entfernen.</p>
               <button className="secondary-btn" type="button" onClick={() => setShowImporter(true)}><ArrowDownToLine size={17}/> Import-Assistent öffnen</button>
             </section>
             </>}
+            <LicensePanel/>
             {simple && <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><ArrowDownToLine size={22}/></span>
                 <div><h2>Passwörter aus anderer App importieren</h2>

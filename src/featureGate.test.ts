@@ -7,16 +7,18 @@ describe('Parola Free features', () => {
     const entry = { ...blankEntry(), title: 'Account', email: 'mail@example.com', username: 'user', password: 'secret' };
     expect(freeEntryEditError(undefined, entry)).toBeNull();
   });
-  it('allows images but rejects Ultra-only custom fields in new entries', () => {
+  it('rejects image additions and Ultra-only custom fields in new Free entries', () => {
     const entry = blankEntry();
-    expect(freeEntryEditError(undefined, { ...entry, images: ['data:image/png;base64,AA=='] })).toBeNull();
+    expect(freeEntryEditError(undefined, { ...entry, images: ['data:image/png;base64,AA=='] })).toMatch(/Ultra/);
     expect(freeEntryEditError(undefined, { ...entry, fields: [{ id: 'a', label: 'PIN', kind: 'pin', value: '1234', createdAt: 1, updatedAt: 1 }] })).toMatch(/Ultra/);
   });
   it('does not lock previous custom data when a basic field changes', () => {
     const existing = { ...blankEntry(), notes: 'old private note', images: ['encrypted-old'], fields: [{ id: 'a', label: 'old', kind: 'text' as const, value: 'value', createdAt: 1, updatedAt: 1 }] };
     expect(freeEntryEditError(existing, { ...existing, username: 'new' })).toBeNull();
     expect(freeEntryEditError(existing, { ...existing, notes: 'changed' })).toMatch(/Ultra/);
-    expect(freeEntryEditError(existing, { ...existing, images: [...existing.images, 'new'] })).toBeNull();
+    expect(freeEntryEditError(existing, { ...existing, images: [...existing.images, 'new'] })).toMatch(/Ultra/);
+    expect(freeEntryEditError(existing, { ...existing, images: [...existing.images] })).toBeNull();
+    expect(freeEntryEditError(existing, { ...existing, images: [] })).toBeNull();
   });
   it('permits removing old premium fields while staying Free', () => {
     const existing = { ...blankEntry(), notes: 'old', images: ['old'], fields: [{ id: 'a', label: 'field', kind: 'text' as const, value: 'old', createdAt: 1, updatedAt: 1 }] };

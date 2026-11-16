@@ -30,7 +30,7 @@ export async function redeemGiftCode(code: string): Promise<{ active: boolean; l
 
 export async function isAdmin(): Promise<boolean> {
   const user = getAuth(firebase()).currentUser;
-  return user ? (await getIdTokenResult(user)).claims.passmanagerAdmin === true : false;
+  return user ? (await getIdTokenResult(user, true)).claims.passmanagerAdmin === true : false;
 }
 
 export async function adminCreateCodes(count: number, days: number): Promise<string[]> {

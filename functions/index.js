@@ -147,7 +147,7 @@ exports.deleteOwnAccount = onCall({ region: 'europe-west3', enforceAppCheck: fal
  * Authentication and Play Publisher API verification are both mandatory.
  * App Check enforcement can be enabled after Android Play Integrity attestation is proven.
  */
-const { verifyPlayPurchase, refreshPlayEntitlement } = require('./playPurchase');
+const { verifyPlayPurchase, refreshPlayEntitlement, checkBillingReadiness } = require('./playPurchase');
 exports.verifyPlayPurchase = onCall({
   region: 'europe-west3', enforceAppCheck: false, maxInstances: 3
 }, async request => {
@@ -169,5 +169,19 @@ exports.refreshPlayEntitlement = onCall({
   } catch (error) {
     console.error('Google Play entitlement refresh failed:', error?.status || error?.name || 'unknown');
     throw new HttpsError('unavailable', 'Google Play kann den Lizenzstatus derzeit nicht prüfen.');
+  }
+});
+
+
+// Read-only checkout readiness. Requires Firebase Authentication and executes
+// under the same Cloud Functions runtime identity as verifyPlayPurchase.
+exports.billingReadiness = onCall({
+  region: 'europe-west3', enforceAppCheck: false, maxInstances: 3
+}, async request => {
+  requireUser(request);
+  try { return await checkBillingReadiness(); }
+  catch (error) {
+    console.error('Google Play purchase-readiness check failed:', error?.status || error?.name || 'unknown');
+    return { ready: false };
   }
 });

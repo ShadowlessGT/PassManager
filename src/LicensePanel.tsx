@@ -15,19 +15,36 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [licenseActive, setLicenseActive] = useState(false);
   const [count, setCount] = useState(1);
   const [days, setDays] = useState(0);
   const [generated, setGenerated] = useState<string[]>([]);
 
   useEffect(() => {
     if (!cloudConfigured) return;
-    return onAuthStateChanged(getAuth(getApp()), user => {
+    let alive = true;
+    const refreshLicense = () => {
+      void lookupLicense().then(x => {
+        if (!alive) return;
+        setLicenseActive(x.active);
+        setInfo(x.active ? x.lifetime ? 'Ultra dauerhaft aktiv'
+          : 'Ultra bis ' + new Date(x.expiresAt!).toLocaleDateString('de-DE')
+          : 'Keine aktive Ultra-Lizenz');
+      }).catch(() => { if (alive) setInfo('Lizenzstatus nicht verfügbar.'); });
+    };
+    const stopAuth = onAuthStateChanged(getAuth(getApp()), user => {
       setLoggedIn(Boolean(user)); setAdmin(false); setGenerated([]);
       if (user) {
-        void lookupLicense().then(x => setInfo(x.active ? x.lifetime ? 'Ultra dauerhaft aktiv' : 'Ultra bis ' + new Date(x.expiresAt!).toLocaleDateString('de-DE') : 'Keine aktive Ultra-Lizenz')).catch(() => setInfo('Lizenzstatus nicht verfügbar.'));
-        void isAdmin().then(setAdmin).catch(() => setAdmin(false));
-      } else setInfo('');
+        refreshLicense();
+        void isAdmin().then(value => { if (alive) setAdmin(value); }).catch(() => { if (alive) setAdmin(false); });
+      } else { setInfo(''); setLicenseActive(false); }
     });
+    window.addEventListener('parola-license-changed', refreshLicense);
+    return () => {
+      alive = false;
+      stopAuth();
+      window.removeEventListener('parola-license-changed', refreshLicense);
+    };
   }, []);
 
   async function login(create: boolean) {
@@ -41,7 +58,7 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
     setBusy(true); setStatus('');
     try {
       const grant = await redeemGiftCode(code.trim());
-      setCode(''); window.dispatchEvent(new Event('parola-license-changed')); setInfo(grant.lifetime ? 'Pro dauerhaft aktiv' : 'Pro bis ' + new Date(grant.expiresAt!).toLocaleDateString('de-DE'));
+      setCode(''); window.dispatchEvent(new Event('parola-license-changed')); setInfo(grant.lifetime ? 'Ultra dauerhaft aktiv' : 'Ultra bis ' + new Date(grant.expiresAt!).toLocaleDateString('de-DE')); setLicenseActive(true);
       setStatus('Freischaltcode erfolgreich eingelöst.');
     } catch { setStatus('Einlösen fehlgeschlagen. Code, Login und Firebase App Check prüfen.'); }
     finally { setBusy(false); }
@@ -63,7 +80,7 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
       <h2>{compact ? 'Freischaltcode vorhanden?' : 'Parola Ultra & Freischaltcodes'}</h2>
       <p>Kostenlose Geschenkcodes mit Firebase-Konto einlösen.</p>
     </div></div>
-    {!compact && <PlayBillingPanel loggedIn={loggedIn}/>}
+    {!compact && <PlayBillingPanel loggedIn={loggedIn} alreadyUltra={licenseActive}/>}
     {!loggedIn ? <div className="cloud-login">
       <label>E-Mail<input type="email" autoComplete="username" placeholder="name@beispiel.de" value={email} onChange={e => setEmail(e.target.value)}/></label>
       <label>Kontopasswort<input type="password" autoComplete="current-password" value={pass} onChange={e => setPass(e.target.value)}/></label>
@@ -86,6 +103,6 @@ export default function LicensePanel({ compact = false }: { compact?: boolean })
       </div>}
     </>}
     {status && <p role="status" className="settings-note">{status}</p>}
-    {!compact && <p className="settings-note">Rabatte und kostenpflichtige Käufe gehören in Google Play Billing. Firebase-Geschenkcodes sind kein Zahlungsweg. Aktivierung erst nach Bereitstellung der Cloud Functions und App Check.</p>}
+    {!compact && <p className="settings-note">Rabatte und kostenpflichtige Käufe gehören in Google Play Billing. Firebase-Geschenkcodes sind kein Zahlungsweg. Käufe werden serverseitig durch Google Play verifiziert; Geschenkcodes sind kostenlos und kein Zahlungsmittel.</p>}
   </section>;
 }

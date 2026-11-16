@@ -7,7 +7,13 @@ export function freeEntryEditError(previous: VaultEntry | undefined, next: Vault
       return 'Eigene Notizen, Beschreibungen und Personen benötigen Parola Ultra.';
     }
   }
-  // Image attachments are part of PAROLA Free, including migrated originals.
+  // Existing migrated images must remain readable/removable in Free, but
+  // adding or replacing any attachment requires an active Ultra entitlement.
+  // This guard is repeated at save time, not merely hidden in the UI.
+  const previouslyStoredImages = new Set(previous?.images ?? []);
+  if (next.images.some(image => !previouslyStoredImages.has(image))) {
+    return 'Neue Bilder und Anhänge benötigen Parola Ultra.';
+  }
   const oldFields = previous?.fields ?? [];
   if ((next.fields ?? []).some(field =>
     !oldFields.some(old => old.id === field.id &&
