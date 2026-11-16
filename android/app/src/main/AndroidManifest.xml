@@ -29,7 +29,7 @@
              requests save consent; it never returns credentials to another app. -->
         <service
             android:name=".ParolaAutofillCaptureService"
-            android:label="Parola – Login speichern"
+            android:label="@string/parola_autofill_service_name"
             android:permission="android.permission.BIND_AUTOFILL_SERVICE"
             android:exported="true">
             <intent-filter>

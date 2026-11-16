@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Passwort Manager: Parola</string>
     <string name="title_activity_main">Passwort Manager: Parola</string>
+    <string name="parola_autofill_service_name">Password Manager: Parola</string>
     <string name="package_name">com.shadowlessstudios.passwordmanager</string>
     <string name="custom_url_scheme">com.shadowlessstudios.passwordmanager</string>
 </resources>
