@@ -113,9 +113,11 @@ export function validateImportedVault(vault: VaultData): VaultData {
     if (!entry || strings.some(field => typeof entry[field] !== 'string' ||
       entry[field].length > 100_000) || !Array.isArray(entry.categories) ||
       !entry.categories.every(category => typeof category === 'string' && category.length <= 70) ||
-      !Array.isArray(entry.images) || entry.images.length > 3 ||
+      !Array.isArray(entry.images) || entry.images.length > 12 ||
       !entry.images.every(image => typeof image === 'string' && image.startsWith('data:image/') &&
-        image.length <= 5_000_000) ||
+        image.length <= 7_000_000) ||
+      (entry.icon !== undefined && (typeof entry.icon !== 'string' ||
+        entry.icon.length > 64)) ||
       (entry.fields !== undefined && (!Array.isArray(entry.fields) || entry.fields.length > 50 ||
         !entry.fields.every(field => field && typeof field.label === 'string' &&
           field.label.length > 0 && field.label.length <= 100 &&

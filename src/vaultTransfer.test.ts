@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankEntry, newVault, makeField } from './types';
 import { parseDelimited, rowsToVaultEntries } from './importer';
-import { exportEncryptedBackup, exportVaultCsv, parseEncryptedBackup } from './vaultTransfer';
+import { exportEncryptedBackup, exportVaultCsv, parseEncryptedBackup, validateImportedVault } from './vaultTransfer';
 import { deriveVaultKey, encryptVault, newSalt, decryptVault } from './crypto';
 
 describe('Password Safe migration and Parola export', () => {
@@ -69,6 +69,23 @@ describe('Password Safe migration and Parola export', () => {
     const csv = exportVaultCsv({ ...newVault(), entries: [e] });
     expect(csv).toContain("'=HYPERLINK");
     expect(csv).toContain("'+1+2");
+  });
+
+  it('keeps per-entry icons and up to 12 imported pictures in encrypted backup format', async () => {
+    const entry = { ...blankEntry(), title: 'Synthetic account', icon: 'house',
+      images: Array.from({ length: 12 }, () => 'data:image/png;base64,AA==') };
+    const vault = { ...newVault(), entries: [entry] };
+    expect(validateImportedVault(vault).entries[0].icon).toBe('house');
+    const salt = newSalt();
+    const key = await deriveVaultKey('synthetic master password only for tests', salt);
+    const envelope = await encryptVault(vault, key, salt);
+    const imported = validateImportedVault(await decryptVault(parseEncryptedBackup(
+      exportEncryptedBackup(envelope)), key));
+    expect(imported.entries[0].icon).toBe('house');
+    expect(imported.entries[0].images).toHaveLength(12);
+    expect(() => validateImportedVault({ ...vault, entries: [
+      { ...entry, icon: 'x'.repeat(65) }
+    ] })).toThrow(/ungültige|große/);
   });
 
   it('backs up only encrypted ciphertext and round-trips with its master key', async () => {

@@ -11,6 +11,7 @@ function fixture(): PasswordSafeRelationalResult {
       {
         sourceId: '31', title: 'Example Portal', createdAt: '1699999999000',
         modifiedAt: '1700000000000', favorite: true, archived: false,
+        iconIdentifier: 'house',
         categories: ['Private', 'Finance'],
         fields: [
           { label: 'Benutzername', standardKey: 'username', isPassword: false,
@@ -30,10 +31,11 @@ function fixture(): PasswordSafeRelationalResult {
       {
         sourceId: '32', title: 'Another Entry', createdAt: '1700000000000',
         modifiedAt: '1700000000000', favorite: false, archived: true,
+        iconIdentifier: '',
         categories: ['Private'], fields: [], images: [], history: []
       }
     ],
-    imageCount: 2, totalImageBytes: 905816,
+    imageCount: 2, totalImageBytes: 905816, sourceIconCount: 1,
     categoryCount: 2, historyCount: 1,
     sourceCategories: [{ name: 'Private', color: '#AA4455' }, { name: 'Finance', color: '#224466' }],
     unsupported: { OTP: 0, Attachments: 0, Passkeys: 0, Tombstones: 0 },
@@ -53,6 +55,8 @@ describe('relational Password Safe source migration', () => {
     expect(account.website).toBe('https://example.invalid');
     expect(account.categories).toEqual(['Private','Finance']);
     expect(account.favorite).toBe(true);
+    expect(account.icon).toBe('house');
+    expect(mapped.sourceIconCount).toBe(1);
     expect(account.fields).toEqual(expect.arrayContaining([expect.objectContaining({
       label: 'PIN', kind: 'pin', value: '1234'
     })]));
@@ -63,6 +67,12 @@ describe('relational Password Safe source migration', () => {
     expect(mapped.imageCount).toBe(2);
     expect(mapped.requiresPartialImportConfirmation).toBe(false);
     expect(mapped.entries[1].lifecycle?.state).toBe('archived');
+  });
+
+  it('fails closed if a per-entry icon relationship is missing', () => {
+    const x = fixture();
+    x.sourceIconCount = 2;
+    expect(() => mapPasswordSafeRelational(x)).toThrow(/Eintragssymbole/);
   });
 
   it('fails closed if an image association is missing', () => {
@@ -108,6 +118,9 @@ describe('relational Password Safe source migration', () => {
       ...base,
       sourceId: String(index + 1),
       title: 'Synthetic record ' + index,
+      iconIdentifier: index < 14 ?
+        ['house','house','house','house','health','health','account','account',
+         'world','twitter','mail','gaming','car','animal'][index] : '',
       images: index < 93 ? [{ id: String(index + 1), byteLength: 167000 }] : [],
       history: index < 75
         ? [{ value: 'synthetic-history-' + index, timestamp: '2022-07-01 12:00:00',
@@ -124,11 +137,14 @@ describe('relational Password Safe source migration', () => {
     }
     x.readRows = 324;
     x.imageCount = 93;
+    x.sourceIconCount = 14;
     x.historyCount = 399;
     x.categoryCount = 24;
     const m = mapPasswordSafeRelational(x);
     expect(m.entries).toHaveLength(324);
     expect(m.imageCount).toBe(93);
+    expect(m.sourceIconCount).toBe(14);
+    expect(m.entries.filter(entry => entry.icon).length).toBe(14);
     expect(m.sourceHistoryCount).toBe(399);
     expect(m.entries.reduce((total, entry) => total + (entry.passwordHistory?.length ?? 0), 0)).toBe(399);
   });

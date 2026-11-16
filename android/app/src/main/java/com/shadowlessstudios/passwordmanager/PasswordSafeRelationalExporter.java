@@ -85,6 +85,7 @@ final class PasswordSafeRelationalExporter {
                 record.put("modifiedAt", safeText(c.getString(3)));
                 record.put("favorite", false);
                 record.put("archived", false);
+                record.put("iconIdentifier", "");
                 JSArray rowFields = new JSArray();
                 JSArray rowCategories = new JSArray();
                 JSArray rowImages = new JSArray();
@@ -148,6 +149,22 @@ final class PasswordSafeRelationalExporter {
                 }
             }
         }
+        if (tableExists(db, "Icons")) {
+            try (Cursor c = db.rawQuery("SELECT EntryID, Identifier FROM Icons ORDER BY ID", null)) {
+                while (c.moveToNext()) {
+                    JSObject target = byId.get(c.getLong(0));
+                    if (target == null) {
+                        throw new IllegalArgumentException("Ein Quell-Icon verweist auf einen fehlenden Eintrag.");
+                    }
+                    String identifier = safeText(c.getString(1));
+                    if (!identifier.matches("[A-Za-z0-9_-]{1,64}") ||
+                        !target.getString("iconIdentifier", "").isEmpty()) {
+                        throw new IllegalArgumentException("Eine Quell-Icon-Zuordnung ist nicht eindeutig.");
+                    }
+                    target.put("iconIdentifier", identifier);
+                }
+            }
+        }
 
         long totalImages = 0;
         final String imageSql = tableExists(db, "ImagesOrder")
@@ -200,7 +217,7 @@ final class PasswordSafeRelationalExporter {
         // Never silently claim passkeys, arbitrary attachments or OTP state
         // were migrated: the current Parola vault has no equivalent structures.
         JSObject unsupported = new JSObject();
-        for (String name : new String[]{"Passkeys","Attachments","OTP","Tombstones","Icons"}) {
+        for (String name : new String[]{"Passkeys","Attachments","OTP","Tombstones"}) {
             unsupported.put(name, tableCount(db, name));
         }
         JSArray sourceCategories = new JSArray();
@@ -226,6 +243,7 @@ final class PasswordSafeRelationalExporter {
         result.put("imageCount", imageCount);
         result.put("totalImageBytes", totalImages);
         result.put("categoryCount", tableCount(db, "Categories"));
+        result.put("sourceIconCount", tableCount(db, "Icons"));
         result.put("historyCount", tableCount(db, "PasswordHistory"));
         result.put("unsupported", unsupported);
         result.put("readRows", entryCount);

@@ -34,6 +34,8 @@ export type VaultEntry = {
   categories: string[];
   person: string;
   images: string[];
+  // Optional per-entry symbol, also supports Password Safe's Icons.Identifier.
+  icon?: string;
   favorite: boolean;
   createdAt: number;
   updatedAt: number;

@@ -25,6 +25,8 @@ import { freeEntryEditError } from './featureGate';
 import InsightsPanel from './InsightsPanel';
 import ArchivePanel from './ArchivePanel';
 import EntryAvatar from './EntryAvatar';
+import { EntryIcon, ENTRY_ICON_CHOICES } from './entryIcons';
+import { shouldAutomaticallyPromptDeviceUnlock } from './automaticDeviceUnlock';
 import { entriesAt, moveEntry, eraseTrashedEntry } from './vaultLifecycle';
 import packageJson from '../package.json';
 import type { LocalSnapshot } from './storage';
@@ -252,6 +254,16 @@ function EntryEditor({ entry, categories, people, simple, ultra, onClose, onSave
                placeholder="z. B. Arbeit, Banking, Wichtig"/>
            </label>
            <CategoryPicker available={categories} selected={draft.categories} onChange={names => update('categories',names)} compact={simple}/>
+          <label>Symbol für diesen Eintrag
+            <select aria-label="Eintragssymbol auswählen" value={draft.icon ?? ''}
+              onChange={event => update('icon', event.target.value || undefined)}>
+              <option value="">Standard-Symbol</option>
+              {ENTRY_ICON_CHOICES.map(choice =>
+                <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+              {draft.icon && !ENTRY_ICON_CHOICES.some(choice => choice.id === draft.icon) &&
+                <option value={draft.icon}>Quell-Symbol: {draft.icon}</option>}
+            </select>
+          </label>
           {!simple && ultra && <label>Kommentare und Notizen<textarea value={draft.notes} onChange={e => update('notes', e.target.value)} rows={4} placeholder="Sicherheitsfragen, Hinweise, freie Notizen..."/></label>}
           <>
           <div className="form-section-title">Bilder und Anhänge</div>
@@ -324,6 +336,7 @@ export default function App() {
   const writes = useRef<Promise<void>>(Promise.resolve());
   const lastActivity = useRef(Date.now());
   const hiddenSince = useRef<number | null>(null);
+  const autoUnlockAttempted = useRef(false);
   const pendingClipboard = useRef<{ value: string; expiresAt: number; timer: number } | null>(null);
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   useEffect(() => {
@@ -427,12 +440,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!shouldAutomaticallyPromptDeviceUnlock({
+      loading, hasVault, deviceSupported, deviceEnabled, working,
+      unlocked: data !== null, attempted: autoUnlockAttempted.current
+    })) return;
+    // Mark before opening Android's biometric prompt to prevent duplicate
+    // prompts from React re-renders or StrictMode effect replay.
+    autoUnlockAttempted.current = true;
+    void deviceUnlock();
+  }, [loading, hasVault, deviceSupported, deviceEnabled, working, data]);
+
+  useEffect(() => {
     if (!notice) return;
     const timeout = window.setTimeout(() => setNotice(''), 3000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
   function lockVault() {
+    // A deliberate lock must not immediately trigger another automatic prompt.
+    autoUnlockAttempted.current = true;
     dataRef.current = null;
     hiddenSince.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
@@ -1198,7 +1224,7 @@ export default function App() {
             </section>
             <section className="settings-card">
               <div className="settings-heading"><span className="settings-icon"><Fingerprint size={22}/></span><div><h2>Entsperrung</h2><p>Schütze deinen Tresor mit deinem Gerät.</p></div></div>
-              <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, unterstützte Gesichtserkennung, PIN oder Muster</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
+              <div className="settings-row"><div><strong>Biometrie und Gerätesperre</strong><small>Fingerabdruck, Gesichtserkennung, PIN oder Muster - beim App-Start automatisch</small></div><button type="button" disabled={!deviceSupported} className={deviceEnabled ? 'toggle active' : 'toggle'} aria-label="Geräteentsperrung umschalten" aria-pressed={deviceEnabled} onClick={() => void toggleDevice()}><span/></button></div>
               {!deviceSupported && <p className="settings-note">Diese Funktion ist in der installierten Android-App mit eingerichteter Gerätesperre verfügbar.</p>}
               {simple && <button type="button" className="quick-optional-action" aria-expanded={showAdvancedSecurity} onClick={() => setShowAdvancedSecurity(v => !v)}>{showAdvancedSecurity ? 'Weitere Sicherheitseinstellungen schließen' : 'Weitere Sicherheitseinstellungen'}</button>}
               {(!simple || showAdvancedSecurity) && <div className="setting-timeouts">
@@ -1356,7 +1382,8 @@ export default function App() {
       {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
           <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
-          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
+          <div className="detail-top"><div className="detail-avatar">{selected.icon ? <EntryIcon id={selected.icon} size={34}/> :
+              selected.images[0] ? <img src={selected.images[0]} alt=""/> : getInitials(selected.title)}</div><h2>{selected.title}</h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
           <div className="detail-fields">
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
