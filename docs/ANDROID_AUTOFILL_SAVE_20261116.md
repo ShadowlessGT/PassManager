@@ -58,3 +58,9 @@ Worktree: N:\Shadowless Studios\Apps\PassManager-Autofill-20261116
 - Unbekannte Domain / Phishing-Website => niemals stilles Überschreiben; Änderungen nur nach expliziter Kontoauswahl.
 - App sperren, Bildschirm aus, Deinstallation, native KeyStore-Fehler, Mehrfachfunde und 7-Tage-Ablauf prüfen.
 - Free- und Premium-Konten mit vorhandenen Feature-Limits testen.
+
+## Integration nach parallelem Main-Update
+
+- Branch enthält zusätzlich Merge a99f6b6 von origin/main 3bc11c5 (Parola 0.7.9, versionCode 26, automatische Geräteentsperrung und neue Eintragssymbole).
+- Erneut geprüft: 104 Vitest-Tests bestanden (28 Testdateien), TypeScript/Vite erfolgreich, Android Debug-APK gebaut (Gradle BUILD SUCCESSFUL).
+- Play-Store-Upload, OTA-Release und Production-Merge bleiben weiterhin gesperrt, bis der Android-Autofill-Save-Flow auf einem Testgerät nachgewiesen ist.
