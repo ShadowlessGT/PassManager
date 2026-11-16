@@ -44,3 +44,11 @@ Stand: 16.11.2026
 ## Google Play Uploadversuch
 
 - 16.11.2026: Erster Upload und anschließende Statusprüfung erhielten Google Play Developer API HTTP 503 (UNAVAILABLE). Es liegt noch keine bestätigte Bundle-28-Annahme vor. Kein Track wurde verändert.
+
+## 16.11.2026: Google Play interner Test veröffentlicht
+
+- Signed AAB 0.7.11 / VC28 wurde hochgeladen; Google Play Readback bestätigt die Annahme.
+- Internal Track: VC28, verifiziert durch INTERNAL_TEST_RELEASE_CONFIRMED=TRUE.
+- Open Testing bleibt VC20, Production bleibt VC24.
+- Erstmaliger HTTP 503 Uploadfehler wurde durch erneuten erfolgreichen Upload behoben.
+- Native Save-only Android Autofill Funktion ist im Build. Ein echter Android-Gerätetest ist vor öffentlicher Veröffentlichung weiterhin erforderlich.
