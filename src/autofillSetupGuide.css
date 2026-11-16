@@ -1,0 +1,45 @@
+.autofill-setup-guide {
+  display:grid;
+  gap:12px;
+  padding:16px;
+  border:1px solid var(--border,#385683);
+  border-radius:15px;
+  background:var(--panel,#15243e);
+  min-width:0;
+}
+.autofill-setup-guide-intro {display:flex;align-items:flex-start;gap:11px;}
+.autofill-setup-guide-intro>svg {flex-shrink:0;margin-top:2px;color:#5dd0b3;}
+.autofill-setup-guide-intro>div {min-width:0;}
+.autofill-setup-guide-intro h3 {margin:0 0 5px;font-size:15px;line-height:1.4;}
+.autofill-setup-guide-intro p {margin:0;font-size:13px;line-height:1.55;color:var(--muted,#bdcae2);}
+.autofill-setup-guide-toggle {
+  display:flex;align-items:center;justify-content:space-between;gap:9px;
+  width:100%;text-align:start;border-radius:10px;padding:11px 13px;
+  color:inherit;background:rgba(91,166,185,.11);border:1px solid rgba(91,166,185,.35);
+  font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+}
+.autofill-setup-guide-toggle:hover {background:rgba(91,166,185,.2);}
+.autofill-setup-guide-toggle:focus-visible {outline:3px solid #e4be68;outline-offset:3px;}
+.autofill-setup-guide-toggle svg {flex-shrink:0;}
+.autofill-setup-guide-steps {display:grid;gap:16px;border-top:1px solid var(--border,#385683);padding-top:14px;}
+.autofill-setup-guide-steps[hidden] {display:none;}
+.autofill-setup-guide-steps section {min-width:0;}
+.autofill-setup-guide-steps h4 {margin:0 0 8px;font-size:13px;line-height:1.5;}
+.autofill-setup-guide-steps ol {padding-inline-start:23px;margin:0;display:grid;gap:7px;list-style:decimal;}
+.autofill-setup-guide-steps li,.autofill-setup-guide-steps p {
+  margin:0;line-height:1.55;font-size:12px;overflow-wrap:anywhere;
+}
+.autofill-setup-guide-steps li::marker {font-weight:700;color:#53d0bb;}
+.autofill-setup-troubleshooting {border-inline-start:3px solid #ddb66d;padding-inline-start:10px;}
+.autofill-setup-limit {display:flex;gap:8px;align-items:flex-start;color:var(--muted,#bdcae2);}
+.autofill-setup-limit svg {flex-shrink:0;margin-top:2px;color:#5dd0b3;}
+html[data-theme="light"] .autofill-setup-guide {background:#eef5fc;color:#1c3452;border-color:#b3cce4;}
+html[data-theme="light"] .autofill-setup-guide-intro p,
+html[data-theme="light"] .autofill-setup-limit {color:#49627a;}
+html[data-theme="light"] .autofill-setup-guide-toggle {background:#dfecfa;border-color:#a7c9e6;}
+html[data-theme="light"] .autofill-setup-guide-toggle:hover {background:#d1e5f8;}
+html[data-theme="light"] .autofill-setup-guide-steps li::marker {color:#167b75;}
+@media(max-width:500px) {
+  .autofill-setup-guide {padding:13px;}
+  .autofill-setup-guide-intro {gap:9px;}
+}

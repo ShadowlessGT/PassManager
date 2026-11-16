@@ -7,6 +7,7 @@ import {
 } from './androidAutofill';
 import type { PendingLogin,PendingSecret,AutofillStatus } from './androidAutofill';
 import { createCapturedEntry,possibleUpdates,updateCapturedEntry } from './autofillSuggestions';
+import AutofillSetupGuide from './AutofillSetupGuide';
 
 type Props={vault:VaultData;onSave:(entry:VaultEntry)=>Promise<void>;compact?:boolean};
 
@@ -128,6 +129,7 @@ export default function AutofillCapturePanel({vault,onSave,compact=false}:Props)
         <ShieldCheck size={16}/> Erkennungen werden ausschließlich verschlüsselt und höchstens 7 Tage auf diesem Gerät vorgemerkt.
         Android zeigt vor dem Erfassen seinen eigenen Speichern-Dialog. Parola fragt vor der Übernahme zusätzlich deine Gerätesperre ab.
       </p>
+      <AutofillSetupGuide/>
       <p className="settings-note">Aktuell: Passworterkennung und Übernahme. Das Ausfüllen bestehender Passwörter in anderen Apps ist noch nicht freigeschaltet.</p>
     </>}
     {(pending.length>0 || !compact) && <div className="autofill-capture-list">

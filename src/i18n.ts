@@ -242,6 +242,9 @@ const getSnapshot = () => activeLanguage;
 export function tr(key: TranslationKey, language: AppLanguage = activeLanguage): string {
   return CATALOG[language]?.[key] || CATALOG.de[key] || key;
 }
+export function useActiveLanguage(): AppLanguage {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
 export function useTranslate(): (key: TranslationKey) => string {
   const language = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return (key: TranslationKey) => tr(key, language);
