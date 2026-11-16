@@ -7,6 +7,7 @@ import './parolaFeatures.css';
 import './autofillCapture.css';
 import './ota.css';
 import './lightThemeContrast.css';
+import './vaultLayout.css';
 import { loadPreferences } from './preferences';
 import { applyLanguage } from './i18n';
 import { resolveAppearance, applyResolvedAppearance } from './theme';

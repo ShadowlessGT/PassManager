@@ -5,7 +5,7 @@ import {
   Copy, Edit3, ExternalLink, Eye, EyeOff, Fingerprint, Folder,
   ImagePlus, KeyRound, LockKeyhole, LogOut, Mail, Plus, Search,
   Settings2, ShieldCheck, Sparkles, Star, Trash2, UserRound, UsersRound,
-  X, Globe2, Shield, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal, Archive
+  X, Globe2, CalendarClock, BarChart3, Camera as CameraIcon, SlidersHorizontal, Archive
 } from 'lucide-react';
 import { newVault, ENTRY_FIELD_PRESETS, FIELD_KINDS, makeField, validateEntryFields } from './types';
 import type { VaultData, VaultEntry, EntryField, VaultCategory } from './types';
@@ -33,6 +33,7 @@ import packageJson from '../package.json';
 import type { LocalSnapshot } from './storage';
 import { SNAPSHOT_INTERVALS } from './snapshotPolicy';
 import { calculatePasswordSecurity } from './securityDashboard';
+import { SORT_OPTIONS,sortVaultEntries } from './vaultSorting';
 import { validateImportedVault } from './vaultTransfer';
 import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
@@ -972,14 +973,15 @@ export default function App() {
   const simple = preferences.mode === 'simple';
   const selectedAppearance = resolveAppearance(preferences.appearance, systemDark);
   const people = useMemo(() => [...new Set(entries.map(item => item.person).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')), [data]);
-  const filtered = useMemo(() => entries.filter(item => {
+  const filtered = useMemo(() => { const matches=entries.filter(item => {
     if (tab === 'favorites' && !item.favorite) return false;
     if (categoryFilter && !item.categories.some(name=>categoryAndDescendants(categories,categoryFilter).has(categoryKey(name)))) return false;
     if (personFilter && item.person !== personFilter) return false;
     const needle = query.toLocaleLowerCase('de');
     return [item.title, item.description, item.username, item.email, item.website, item.person, ...item.categories, ...(item.tags??[]), ...(item.fields ?? []).map(field => field.label)]
       .some(value => value.toLocaleLowerCase('de').includes(needle));
-  }).sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt), [data, tab, categoryFilter, personFilter, query]);
+  }); return sortVaultEntries(matches,preferences.vaultSort);
+  }, [data, tab, categoryFilter, personFilter, query, preferences.vaultSort]);
   const selected = entries.find(item => item.id === selectedId) ?? null;
 
   if (loading) return <main className="lock-layout"><div className="loader"/><p>Verschlüsselter Tresor wird vorbereitet...</p></main>;
@@ -1039,7 +1041,8 @@ export default function App() {
   const showEntries = tab === 'vault' || tab === 'favorites' || (tab === 'categories' && categoryFilter) || (tab === 'people' && personFilter);
 
   return (
-    <div className={simple ? 'app-shell simple-ui text-' + preferences.textSize : 'app-shell expert-ui'}>
+    <div className={(simple ? 'app-shell simple-ui text-' + preferences.textSize : 'app-shell expert-ui')+
+      (tab==='vault'?' vault-landing':'')}>
       <div className="app-content">
         <header className="topbar">
           <div className="brand-line"><div className="brand-icon"><img src="/parola-icon.png" alt="" /></div><div><strong>Passwort Manager: <span>Parola</span></strong><small>SHADOWLESS STUDIOS</small></div></div>
@@ -1061,28 +1064,36 @@ export default function App() {
                 ? (tab === 'categories' ? 'Finde deine Zugänge in übersichtlichen Ordnern.' : entries.length + ' ' + (entries.length === 1 ? 'gespeicherter Zugang' : 'gespeicherte Zugänge'))
                 : entries.length + ' ' + (entries.length === 1 ? 'Eintrag' : 'Einträge') + ' sicher verwahrt'}</p>
             </div>
-            {tab !== 'settings' && tab !== 'insights' && (!simple || tab !== 'vault') && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
+            {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites') && <button className="add-btn" type="button" onClick={() => setShowQuickAdd(true)} aria-label="Neuen Eintrag hinzufügen"><Plus size={22}/><span>Neu</span></button>}
           </div>
 
-          {tab === 'vault' && <div className="quick-action-strip">
-            <button type="button" className="quick-primary" onClick={() => setShowQuickAdd(true)}><Plus size={22}/> {simple ? 'Passwort hinzufügen' : 'Schnell speichern'}</button>
-            <button type="button" className="quick-secondary" onClick={() => setTab('archive')}><Archive size={19}/> Archiv / Papierkorb</button>
-            {!simple && <button type="button" className="quick-secondary" onClick={() => setShowOCR(true)}><CameraIcon size={20}/> Aus Bild erkennen</button>}
-          </div>}
-
-          {tab === 'vault' && <AutofillCapturePanel vault={data} onSave={saveEntry} compact/>}
-          {tab === 'vault' && securitySummary && <button className="security-digest"  type="button" onClick={()=>setTab('insights')}>
-            <ShieldCheck size={21}/>
-            <span><strong>Sicherheitscenter</strong><small>{securitySummary.score===null?'Noch keine Passwörter':
-              securitySummary.score+'/100 · '+securitySummary.recommendations.length+' Empfehlungen'} · Lokal geprüft</small></span>
-            <ChevronRight size={20}/>
-          </button>}
-          {tab === 'vault' && !simple && <div className="welcome-panel">
-            <div><span className="welcome-shield"><Shield size={21}/></span><h2>Alles an einem sicheren Ort.</h2><p>Deine sensiblen Daten sind lokal verschlüsselt und nur für dich sichtbar.</p></div>
-            <div className="welcome-visual"><KeyRound size={45} strokeWidth={1.5}/></div>
-          </div>}
-
           {tab !== 'settings' && tab !== 'insights' && (tab === 'vault' || categoryFilter || tab === 'favorites' || tab === 'people') && <div className="searchbox"><Search size={20}/><input aria-label="Einträge durchsuchen" placeholder={simple ? 'Nach einem Zugang suchen …' : 'Passwörter, Namen, E-Mails suchen...'} value={query} onChange={e => setQuery(e.target.value)}/>{query && <button className="icon-btn compact" onClick={() => setQuery('')} aria-label="Suche löschen"><X size={17}/></button>}</div>}
+
+          {tab === 'vault' && <div className="vault-toolbar">
+            {securitySummary && <button className="vault-security-link" type="button"
+              onClick={()=>setTab('insights')} aria-label="Sicherheitscenter öffnen">
+              <ShieldCheck size={17}/> <span>Sicherheit <strong>{securitySummary.score??'–'}/100</strong></span>
+              <ChevronRight size={15}/>
+            </button>}
+            <button className="vault-more-toggle" type="button"
+              aria-expanded={preferences.vaultExtrasExpanded}
+              onClick={()=>setPreferences(previous=>({...previous,vaultExtrasExpanded:!previous.vaultExtrasExpanded}))}>
+              <SlidersHorizontal size={17}/> {preferences.vaultExtrasExpanded?'Aktionen ausblenden':'Weitere Aktionen'}
+            </button>
+          </div>}
+          {tab === 'vault' && preferences.vaultExtrasExpanded && <div className="vault-actions-panel">
+            <div className="quick-action-strip">
+              <button type="button" className="quick-primary" onClick={()=>setShowQuickAdd(true)}>
+                <Plus size={17}/> Schnell speichern</button>
+              <button type="button" className="quick-secondary" onClick={()=>setTab('archive')}>
+                <Archive size={17}/> Archiv / Papierkorb</button>
+              {!simple && <button type="button" className="quick-secondary" onClick={()=>setShowOCR(true)}>
+                <CameraIcon size={17}/> Aus Bild erkennen</button>}
+            </div>
+            <p className="vault-actions-note"><LockKeyhole size={15}/>
+              Deine Einträge sind lokal verschlüsselt. Weitere Prüfungen findest du im Sicherheitscenter.</p>
+          </div>}
+          {tab === 'vault' && <AutofillCapturePanel vault={data} onSave={saveEntry} compact/>}
 
           {tab === 'vault' && !simple && people.length > 0 && <div className="person-filter">
             <label>Personenfilter <select value={personFilter ?? ''} onChange={e => setPersonFilter(e.target.value || null)}>
@@ -1096,7 +1107,9 @@ export default function App() {
              onTrash={id=>setEntryLocation(id,'trashed')}
              onErase={eraseTrashed}/>}
            {tab === 'categories' && !categoryFilter && <CategoryManager simple={simple}
-            categories={categories} entries={entries}
+            categories={categories} entries={entries} sort={preferences.categorySort} columns={preferences.categoryColumns}
+             onSortChange={sort=>setPreferences(previous=>({...previous,categorySort:sort}))}
+             onColumnsChange={columns=>setPreferences(previous=>({...previous,categoryColumns:columns}))}
             onOpen={name => { setCategoryFilter(name); setQuery(''); }}
             onSave={saveCategory} onDelete={deleteCategory}/>}
 
@@ -1110,7 +1123,16 @@ export default function App() {
 
           {showEntries && <>
             {(categoryFilter || personFilter) && <button className="back-filter" type="button" onClick={() => { setCategoryFilter(null); setPersonFilter(null); }}><ArrowLeft size={16}/> Alle {categoryFilter ? 'Kategorien' : 'Personen'}</button>}
-            <div className="list-title"><h2>{tab === 'favorites' ? 'Markierte Einträge' : categoryFilter || personFilter ? 'Einträge in diesem Ordner' : simple ? 'Gespeicherte Zugänge' : 'Deine Einträge'}</h2><span>{filtered.length}</span></div>
+            <div className="list-title vault-list-title">
+              <h2>{tab === 'favorites' ? 'Markierte Einträge' : categoryFilter || personFilter ? 'Einträge in diesem Ordner' : simple ? 'Gespeicherte Zugänge' : 'Deine Einträge'}</h2>
+              <span>{filtered.length}</span>
+              <label className="vault-sort-control"><span className="sr-only">Einträge sortieren</span>
+                <select aria-label="Einträge sortieren" value={preferences.vaultSort}
+                  onChange={e=>setPreferences(previous=>({...previous,vaultSort:e.target.value as UserPreferences['vaultSort']}))}>
+                  {SORT_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="entries-list">
               {filtered.map(item => (
                 <article className="entry-card" key={item.id}>
