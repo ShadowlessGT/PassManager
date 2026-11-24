@@ -40,7 +40,9 @@ import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
 import { generateStrongPassword } from './passwordGenerator';
 import { validateNewMasterPassword, masterPasswordStrength } from './masterPassword';
-import { logActivity, trackPasswordHistory } from './insights';
+import { trackPasswordHistory, visiblePreviousPasswords } from './insights';
+import { applyActivityBatch } from './activityBatch';
+import type { PendingActivity } from './activityBatch';
 import { App as NativeApp } from '@capacitor/app';
 import CategoryPicker from './CategoryPicker';
 import CategoryManager from './CategoryManager';
@@ -390,6 +392,13 @@ export default function App() {
   const hiddenSince = useRef<number | null>(null);
   const autoUnlockAttempted = useRef(false);
   const pendingClipboard = useRef<{ value: string; expiresAt: number; timer: number } | null>(null);
+  // Browsing a record must never synchronously re-encrypt the entire vault.
+  // Activity metadata is optional and can be persisted as one idle batch.
+  const pendingActivities = useRef<PendingActivity[]>([]);
+  const activityFlushTimer = useRef<number | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
+
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   useEffect(() => {
     document.documentElement.dataset.parolaAccent = preferences.accentColor;
@@ -509,6 +518,12 @@ export default function App() {
   }, [notice]);
 
   function lockVault() {
+    // Activity counters are best effort. Never keep identifiers around once
+    // the vault is locked, and never delay an automatic security lock for stats.
+    if (activityFlushTimer.current !== null) window.clearTimeout(activityFlushTimer.current);
+    activityFlushTimer.current = null;
+    pendingActivities.current = [];
+    selectedIdRef.current = null;
     // A deliberate lock must not immediately trigger another automatic prompt.
     autoUnlockAttempted.current = true;
     dataRef.current = null;
@@ -729,23 +744,40 @@ export default function App() {
     catch { setNotice('Änderung fehlgeschlagen'); }
   }
 
-  async function recordActivity(entryId: string, kind: ActivityKind, fieldType?: string) {
-    try {
-      await mutateVault(current => ({ ...current, entries: current.entries.map(value =>
-        value.id === entryId ? logActivity(value, kind, fieldType) : value
-      ) }));
-    } catch { /* Analytics may never block vault actions. */ }
+  function scheduleActivityFlush() {
+    if (activityFlushTimer.current !== null) window.clearTimeout(activityFlushTimer.current);
+    activityFlushTimer.current = window.setTimeout(() => {
+      activityFlushTimer.current = null;
+      // Never interrupt an open detail sheet; merge lightweight activity once
+      // the user has returned to the vault and stopped interacting.
+      if (selectedIdRef.current !== null || dataRef.current === null) return;
+      const batch = pendingActivities.current.splice(0);
+      if (!batch.length) return;
+      void mutateVault(current => applyActivityBatch(current, batch))
+        .catch(() => { /* Activity stats must never block credentials. */ });
+    }, 4000);
+  }
+
+  useEffect(() => {
+    if (selectedId === null && pendingActivities.current.length > 0) scheduleActivityFlush();
+  }, [selectedId]);
+
+  function recordActivity(entryId: string, kind: ActivityKind, fieldType?: string) {
+    if (!dataRef.current) return;
+    pendingActivities.current.push({ entryId, kind, fieldType, at: Date.now() });
+    if (selectedIdRef.current === null) scheduleActivityFlush();
   }
 
   function openEntry(id: string) {
+    selectedIdRef.current = id;
     setSelectedId(id); setReveal([]); setShowExtraDetails(false);
-    void recordActivity(id, 'open');
+    recordActivity(id, 'open');
   }
 
   function toggleReveal(fieldId: string, entryId: string) {
     const wasShown = reveal.includes(fieldId);
     setReveal(current => current.includes(fieldId) ? current.filter(id => id !== fieldId) : [...current, fieldId]);
-    if (!wasShown) void recordActivity(entryId, 'reveal');
+    if (!wasShown) recordActivity(entryId, 'reveal');
   }
 
   async function copyValue(value: string, label: string, entryId?: string, fieldType?: string) {
@@ -760,7 +792,7 @@ export default function App() {
         pendingClipboard.current = { value, expiresAt, timer };
       }
       setNotice(label + ' kopiert');
-      if (entryId) void recordActivity(entryId, 'copy', fieldType ?? label);
+      if (entryId) recordActivity(entryId, 'copy', fieldType ?? label);
     } catch { setNotice('Kopieren nicht möglich - Clipboard-Berechtigung prüfen'); }
   }  async function clearHistory(entryId: string) {
     try {
@@ -1042,6 +1074,7 @@ export default function App() {
   }); return sortVaultEntries(matches,preferences.vaultSort);
   }, [data, tab, categoryFilter, personFilter, query, preferences.vaultSort]);
   const selected = entries.find(item => item.id === selectedId) ?? null;
+  const previousPasswords = selected ? visiblePreviousPasswords(selected) : [];
 
   if (loading) return <main className="lock-layout"><div className="loader"/><p>Verschlüsselter Tresor wird vorbereitet...</p></main>;
 
@@ -1491,18 +1524,21 @@ export default function App() {
                 <button className="icon-btn compact" type="button" onClick={() => void copyValue(field.value, field.label, selected.id, field.kind)} aria-label={field.label + ' kopieren'}><Copy size={18}/></button>
               </div>
             </div>)}
-            {(selected.passwordHistory ?? []).length > 0 && <div className="detail-field history-details">
-              <span><CalendarClock size={16}/> Vorherige Passwörter (verschlüsselt gespeichert)</span>
-              {(selected.passwordHistory ?? []).map((past, index) => {
-                const id = 'old-password-' + selected.id + '-' + index;
-                return <div className="historical-password" key={id}>
-                  <small>{formatDate(past.replacedAt)}</small>
-                  <strong className={reveal.includes(id) ? 'secret-text' : 'masked'}>{reveal.includes(id) ? past.value : '••••••••'}</strong>
-                  <button className="icon-btn compact" type="button" aria-label="Altes Passwort anzeigen" onClick={() => toggleReveal(id, selected.id)}>{reveal.includes(id) ? <EyeOff size={17}/> : <Eye size={17}/>}</button>
-                  <button className="icon-btn compact" type="button" aria-label="Altes Passwort kopieren" onClick={() => void copyValue(past.value, 'Altes Passwort', selected.id, 'Historie')}><Copy size={17}/></button>
-                </div>;
-              })}
-              <button className="danger-btn" type="button" onClick={() => {if(window.confirm('Alle vorherigen Passwörter dieses Eintrags unwiderruflich löschen?')) void clearHistory(selected.id);}}><Trash2 size={15}/> Historie löschen</button>
+            {previousPasswords.length > 0 && <div className="detail-field history-details">
+              <details className="password-history-disclosure" key={selected.id}>
+                <summary><CalendarClock size={16}/> Vorherige Passwörter ({previousPasswords.length}) <ChevronRight size={16} className="history-chevron"/></summary>
+                <p className="history-help">Hier stehen nur frühere Passwörter. Aktuelle, identische Werte werden nicht doppelt angezeigt.</p>
+                {previousPasswords.map((past, index) => {
+                  const id = 'old-password-' + selected.id + '-' + index;
+                  return <div className="historical-password" key={id}>
+                    <small>{formatDate(past.replacedAt)}</small>
+                    <strong className={reveal.includes(id) ? 'secret-text' : 'masked'}>{reveal.includes(id) ? past.value : '••••••••'}</strong>
+                    <button className="icon-btn compact" type="button" aria-label="Altes Passwort anzeigen" onClick={() => toggleReveal(id, selected.id)}>{reveal.includes(id) ? <EyeOff size={17}/> : <Eye size={17}/>}</button>
+                    <button className="icon-btn compact" type="button" aria-label="Altes Passwort kopieren" onClick={() => void copyValue(past.value, 'Altes Passwort', selected.id, 'Historie')}><Copy size={17}/></button>
+                  </div>;
+                })}
+                <button className="danger-btn" type="button" onClick={() => {if(window.confirm('Alle vorherigen Passwörter dieses Eintrags unwiderruflich löschen?')) void clearHistory(selected.id);}}><Trash2 size={15}/> Historie löschen</button>
+              </details>
             </div>}
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}

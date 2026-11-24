@@ -38,6 +38,13 @@ export function logActivity(entry: VaultEntry, kind: ActivityKind, fieldType?: s
   return { ...entry, activity };
 }
 
+/** Presentation-only filter: never erase imported history from ciphertext.
+ * A source can include its current password in the historical table as well.
+ */
+export function visiblePreviousPasswords(entry: VaultEntry): NonNullable<VaultEntry['passwordHistory']> {
+  return (entry.passwordHistory ?? []).filter(item => Boolean(item.value) && item.value !== entry.password);
+}
+
 export function trackPasswordHistory(previous: VaultEntry | undefined, current: VaultEntry): VaultEntry {
   // Storing earlier secrets is explicitly opt-in and off by default.
   if (!current.keepPasswordHistory) return { ...current, passwordHistory: [] };
