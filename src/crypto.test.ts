@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { decryptVault, deriveVaultKey, encryptVault, newSalt } from './crypto';
+import { decryptVault, deriveVaultKey, encryptVault, newSalt, toBase64, fromBase64 } from './crypto';
 import { blankEntry, newVault } from './types';
 
 describe('vault encryption', () => {
+  it('preserves the standard base64 format across large vault chunk boundaries', () => {
+    for (const length of [0, 1, 2, 3, 24575, 24576, 24577, 49154, 1048579]) {
+      const bytes = Uint8Array.from({ length }, (_, i) => (i * 17 + 251) & 255);
+      const expected = Buffer.from(bytes).toString('base64');
+      expect(toBase64(bytes)).toBe(expected);
+      expect(fromBase64(expected)).toEqual(bytes);
+    }
+  });
+
   it('round-trips the entire entry and uses randomized nonces', async () => {
     const salt = newSalt();
     const key = await deriveVaultKey('a very long and unique test master password', salt);

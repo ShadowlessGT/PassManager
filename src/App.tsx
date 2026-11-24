@@ -40,7 +40,8 @@ import QuickAdd from './QuickAdd';
 import OcrCapture from './OcrCapture';
 import { generateStrongPassword } from './passwordGenerator';
 import { validateNewMasterPassword, masterPasswordStrength } from './masterPassword';
-import { trackPasswordHistory, visiblePreviousPasswords } from './insights';
+import { trackPasswordHistory } from './insights';
+import PasswordHistory from './PasswordHistory';
 import { applyActivityBatch } from './activityBatch';
 import type { PendingActivity } from './activityBatch';
 import { App as NativeApp } from '@capacitor/app';
@@ -751,6 +752,10 @@ export default function App() {
       // Never interrupt an open detail sheet; merge lightweight activity once
       // the user has returned to the vault and stopped interacting.
       if (selectedIdRef.current !== null || dataRef.current === null) return;
+      if (document.hidden || Date.now() - lastActivity.current < 4000) {
+        scheduleActivityFlush();
+        return;
+      }
       const batch = pendingActivities.current.splice(0);
       if (!batch.length) return;
       void mutateVault(current => applyActivityBatch(current, batch))
@@ -760,6 +765,10 @@ export default function App() {
 
   useEffect(() => {
     if (selectedId === null && pendingActivities.current.length > 0) scheduleActivityFlush();
+    return () => {
+      if (activityFlushTimer.current !== null) window.clearTimeout(activityFlushTimer.current);
+      activityFlushTimer.current = null;
+    };
   }, [selectedId]);
 
   function recordActivity(entryId: string, kind: ActivityKind, fieldType?: string) {
@@ -770,6 +779,8 @@ export default function App() {
 
   function openEntry(id: string) {
     selectedIdRef.current = id;
+    if (activityFlushTimer.current !== null) window.clearTimeout(activityFlushTimer.current);
+    activityFlushTimer.current = null;
     setSelectedId(id); setReveal([]); setShowExtraDetails(false);
     recordActivity(id, 'open');
   }
@@ -1074,7 +1085,6 @@ export default function App() {
   }); return sortVaultEntries(matches,preferences.vaultSort);
   }, [data, tab, categoryFilter, personFilter, query, preferences.vaultSort]);
   const selected = entries.find(item => item.id === selectedId) ?? null;
-  const previousPasswords = selected ? visiblePreviousPasswords(selected) : [];
 
   if (loading) return <main className="lock-layout"><div className="loader"/><p>Verschlüsselter Tresor wird vorbereitet...</p></main>;
 
@@ -1499,15 +1509,19 @@ export default function App() {
 
       <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.filter(item => !simple || ['vault','categories','settings'].includes(item.id)).map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{t(NAV_TEXT[item.id])}</span></button>; })}</nav>
 
-      {selected && <div className="overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
+      {selected && <div className="overlay detail-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
         <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
           <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
           <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> :
-              selected.icon ? <EntryIcon id={selected.icon} size={34}/> : getInitials(selected.title)}</div><h2 className="detail-entry-name">{selected.icon && <EntryIcon id={selected.icon} size={22}/>}<span>{selected.title}</span></h2><p>{selected.description || 'Dein sicherer Eintrag'}</p><div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
+              selected.icon ? <EntryIcon id={selected.icon} size={34}/> : getInitials(selected.title)}</div><h2 className="detail-entry-name">{selected.icon && <EntryIcon id={selected.icon} size={22}/>}<span>{selected.title}</span></h2>{selected.description && <p>{selected.description}</p>}<div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
           <div className="detail-fields">
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
             {selected.email && <div className="detail-field"><span><Mail size={16}/> E-Mail</span><div><strong>{selected.email}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.email, 'E-Mail', selected.id, 'E-Mail')} aria-label="E-Mail kopieren"><Copy size={18}/></button></div></div>}
-            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : preferences.maskLength ? '\u2022'.repeat(Math.min(32,[...selected.password].length)) : '\u2022'.repeat(8)}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            {selected.password && <div className="detail-field"><span><KeyRound size={16}/> Aktuelles Passwort</span><div><strong className={!reveal.includes(selected.id) ? 'masked' : 'secret-text'}>{reveal.includes(selected.id) ? selected.password : preferences.maskLength ? '\u2022'.repeat(Math.min(32,[...selected.password].length)) : '\u2022'.repeat(8)}</strong><button className="icon-btn compact" onClick={() => toggleReveal(selected.id, selected.id)} aria-label="Passwort anzeigen oder verbergen">{reveal.includes(selected.id) ? <EyeOff size={18}/> : <Eye size={18}/>}</button><button className="icon-btn compact" onClick={() => void copyValue(selected.password, 'Passwort', selected.id, 'Passwort')} aria-label="Passwort kopieren"><Copy size={18}/></button></div></div>}
+            <PasswordHistory key={selected.id} entry={selected} formatDate={formatDate}
+              onReveal={() => recordActivity(selected.id, 'reveal')}
+              onCopy={value => void copyValue(value, 'Altes Passwort', selected.id, 'Historie')}
+              onClear={() => { if (window.confirm('Alle vorherigen Passwörter dieses Eintrags unwiderruflich löschen?')) void clearHistory(selected.id); }}/>
             {simple && <button type="button" className="secondary-btn show-more-entry" onClick={() => setShowExtraDetails(value => !value)}>
               {showExtraDetails ? 'Weniger anzeigen' : 'Weitere Informationen anzeigen'}
             </button>}
@@ -1524,25 +1538,9 @@ export default function App() {
                 <button className="icon-btn compact" type="button" onClick={() => void copyValue(field.value, field.label, selected.id, field.kind)} aria-label={field.label + ' kopieren'}><Copy size={18}/></button>
               </div>
             </div>)}
-            {previousPasswords.length > 0 && <div className="detail-field history-details">
-              <details className="password-history-disclosure" key={selected.id}>
-                <summary><CalendarClock size={16}/> Vorherige Passwörter ({previousPasswords.length}) <ChevronRight size={16} className="history-chevron"/></summary>
-                <p className="history-help">Hier stehen nur frühere Passwörter. Aktuelle, identische Werte werden nicht doppelt angezeigt.</p>
-                {previousPasswords.map((past, index) => {
-                  const id = 'old-password-' + selected.id + '-' + index;
-                  return <div className="historical-password" key={id}>
-                    <small>{formatDate(past.replacedAt)}</small>
-                    <strong className={reveal.includes(id) ? 'secret-text' : 'masked'}>{reveal.includes(id) ? past.value : '••••••••'}</strong>
-                    <button className="icon-btn compact" type="button" aria-label="Altes Passwort anzeigen" onClick={() => toggleReveal(id, selected.id)}>{reveal.includes(id) ? <EyeOff size={17}/> : <Eye size={17}/>}</button>
-                    <button className="icon-btn compact" type="button" aria-label="Altes Passwort kopieren" onClick={() => void copyValue(past.value, 'Altes Passwort', selected.id, 'Historie')}><Copy size={17}/></button>
-                  </div>;
-                })}
-                <button className="danger-btn" type="button" onClick={() => {if(window.confirm('Alle vorherigen Passwörter dieses Eintrags unwiderruflich löschen?')) void clearHistory(selected.id);}}><Trash2 size={15}/> Historie löschen</button>
-              </details>
-            </div>}
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}
-            {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} alt={'Anhang ' + (index + 1)}/>)}</div></div>}
+            {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} loading="lazy" decoding="async" alt={'Anhang ' + (index + 1)}/>)}</div></div>}
             </>}
           </div>
           <div className="detail-footer"><span>Aktualisiert am {formatDate(selected.updatedAt)}</span>

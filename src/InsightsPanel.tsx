@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart3, CalendarClock, Copy, Eye, Fingerprint, KeyRound, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
 import type { VaultData, VaultEntry } from './types';
-import { calculateInsights } from './insights';
+import { calculateInsights, visiblePreviousPasswords } from './insights';
 import { PasswordStatistics, SecurityOverview } from './PasswordStatistics';
 
 type Props = {
@@ -30,7 +30,7 @@ function Stat({ name, amount, icon: Icon }: { name: string; amount: number; icon
 export default function InsightsPanel({ data, onOpen, onDeleteHistory }: Props) {
   const stats = useMemo(() => calculateInsights(data), [data]);
   const [mode, setMode] = useState<'overview' | 'security' | 'statistics' | 'history'>('security');
-  const recentHistory = useMemo(() => data.entries.filter(e => !e.lifecycle && (e.passwordHistory?.length ?? 0) > 0)
+  const recentHistory = useMemo(() => data.entries.filter(e => !e.lifecycle && visiblePreviousPasswords(e).length > 0)
     .sort((a, b) => (b.passwordHistory?.at(-1)?.replacedAt ?? 0) - (a.passwordHistory?.at(-1)?.replacedAt ?? 0)), [data]);
   const duplicateEntries = new Set(stats.security.reusedGroups.flatMap(g => g.entryIds));
   const vulnerable = data.entries.filter(e => !e.lifecycle && duplicateEntries.has(e.id));
@@ -77,7 +77,7 @@ export default function InsightsPanel({ data, onOpen, onDeleteHistory }: Props) 
     </>}
     {mode === 'history' && <section className="insights-card">
       <h3><CalendarClock size={17}/> Gesicherte Passwort-Historie</h3>
-      <p className="insights-empty">Bis zu 10 vorherige Hauptpasswörter pro Eintrag werden verschlüsselt aufbewahrt. Sie sind ausschließlich nach dem Entsperren des Tresors zugänglich und werden hier nicht im Klartext angezeigt.</p>
+      <p className="insights-empty">Frühere Hauptpasswörter werden verschlüsselt aufbewahrt. Sie sind ausschließlich nach dem Entsperren des Tresors zugänglich und werden hier nicht im Klartext angezeigt.</p>
       {recentHistory.length === 0 ? <p className="insights-empty">Noch keine Passwortwechsel gespeichert.</p> :
         recentHistory.map(entry => <HistoryEntry key={entry.id} entry={entry} onOpen={onOpen} onDeleteHistory={onDeleteHistory}/>)}
     </section>}
@@ -85,7 +85,7 @@ export default function InsightsPanel({ data, onOpen, onDeleteHistory }: Props) 
 }
 
 function HistoryEntry({entry, onOpen, onDeleteHistory}: {entry:VaultEntry;onOpen:(id:string)=>void;onDeleteHistory:(id:string)=>Promise<void>}) {
-  return <div className="history-row"><div><strong>{entry.title}</strong><small>{entry.passwordHistory?.length ?? 0} vorherige Passwörter · Letzter Wechsel {new Date(entry.passwordChangedAt ?? entry.passwordHistory?.at(-1)?.replacedAt ?? entry.updatedAt).toLocaleDateString('de-DE')}</small></div>
+  return <div className="history-row"><div><strong>{entry.title}</strong><small>{visiblePreviousPasswords(entry).length} vorherige Passwörter · Letzter Wechsel {new Date(entry.passwordChangedAt ?? entry.passwordHistory?.at(-1)?.replacedAt ?? entry.updatedAt).toLocaleDateString('de-DE')}</small></div>
     <div className="history-actions"><button className="secondary-btn" type="button" onClick={() => onOpen(entry.id)}>Anzeigen</button>
       <button className="icon-btn" type="button" title="Historie löschen" aria-label="Historie löschen" onClick={() => { if(window.confirm('Gesamte Passwort-Historie von "' + entry.title + '" löschen?')) void onDeleteHistory(entry.id); }}><Trash2 size={17}/></button></div>
   </div>;

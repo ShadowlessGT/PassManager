@@ -284,25 +284,27 @@ h1, h2, h3, p { margin-top: 0; }
 .history-row strong { display:block; font-size:13px; }
 .history-row small { color:#b7caf0; font-size:11px; display:block; margin-top:5px; }
 .history-actions { display:flex; gap:5px; align-items:center; }
-.history-details { display:grid; gap:8px; }
-.password-history-disclosure { min-width:0; }
-.password-history-disclosure > summary {
-  display:flex; align-items:center; gap:9px; cursor:pointer; list-style:none;
-  font-size:13px; font-weight:600; color:var(--text, #dce9fc);
-  padding:8px 0; user-select:none;
-}
-.password-history-disclosure > summary::-webkit-details-marker { display:none; }
-.password-history-disclosure .history-chevron { margin-left:auto; transition:transform 140ms ease; }
-.password-history-disclosure[open] .history-chevron { transform:rotate(90deg); }
-.password-history-disclosure .history-help {
-  font-size:12px; line-height:1.4; margin:4px 0 10px; color:#99b0d3;
-}
-.password-history-disclosure .historical-password { margin:7px 0; }
-.password-history-disclosure .danger-btn { width:100%; margin-top:7px; }
-
+/* Keep the important credential in focus; history is a compact secondary action. */
+.detail-overlay { backdrop-filter:none; }
+.details-sheet .detail-top { padding-top:22px; padding-bottom:16px; }
+.details-sheet .detail-avatar { width:64px; height:64px; border-radius:17px; }
+.password-history-compact { padding:0 0 12px; }
+.history-toggle { width:100%; display:flex; align-items:center; gap:9px; min-height:44px; padding:8px 10px;
+  color:#b7caf0; background:transparent; border:1px solid #385683; border-radius:10px; text-align:left; font-size:13px; }
+.history-toggle > span:first-of-type { flex:1; font-weight:600; }
+.history-count { font-size:12px; color:inherit; }
+.history-chevron { transition:transform 140ms ease; }
+.history-chevron.expanded { transform:rotate(90deg); }
+.history-expanded { padding:9px 0 0; }
+.history-help { font-size:12px; color:#99b0d3; line-height:1.4; margin:0 0 8px; }
+.history-expanded .historical-password { margin:7px 0; }
+.history-clear { width:100%; margin-top:7px; }
+html[data-theme="light"] .history-toggle { color:#29496a; border-color:#ccd9e8; }
+html[data-theme="light"] .history-help, html[data-theme="light"] .historical-password small { color:#526c85; }
+html[data-theme="light"] .historical-password { border-color:#dce7fa; }
 .historical-password { display:flex; align-items:center; gap:6px; border:1px solid #223655; border-radius:9px; padding:7px; min-width:0; }
 .historical-password small { font-size:10px; color:#99b0d3; width:70px; flex-shrink:0; }
-.historical-password strong { min-width:0; overflow-wrap:anywhere; }
+.historical-password strong { flex:1; min-width:0; overflow-wrap:anywhere; font-size:14px; font-weight:580; }
 .historical-password .icon-btn { flex-shrink:0; }
 .ocr-buttons { display:flex; gap:9px; flex-wrap:wrap; }
 .ocr-buttons > button { flex:1; }

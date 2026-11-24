@@ -14,14 +14,21 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
+  // 24 KiB is divisible by three, so only the last base64 chunk has padding.
+  // Avoid one string allocation per byte for multi-MB image-heavy vaults.
+  const chunkSize = 24_576;
+  const chunks: string[] = [];
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))));
+  }
+  return chunks.join('');
 }
 
 export function fromBase64(encoded: string): Uint8Array {
   const binary = atob(encoded);
-  return Uint8Array.from(binary, character => character.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 export function newSalt(): string {
