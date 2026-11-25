@@ -29,6 +29,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ParolaBillingPlugin.class);
+        registerPlugin(ParolaRecommendPlugin.class);
         registerPlugin(ParolaDocumentExportPlugin.class);
         registerPlugin(ParolaPasswordSafeDbPlugin.class);
         registerPlugin(ParolaAutofillPlugin.class);

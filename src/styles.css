@@ -699,3 +699,25 @@ html[dir="rtl"] textarea { direction:auto; unicode-bidi:plaintext; }
 .image-viewer-canvas { display:grid; place-items:center; }
 .image-viewer-canvas img { width:100%; height:100%; min-height:0; object-fit:contain; display:block; user-select:none; -webkit-user-drag:none; }
 .image-viewer-controls .icon-btn:disabled { opacity:.35; }
+
+/* Offline app recommendation: native modal top layer and bounded mobile layout. */
+.recommend-brand,.recommend-gate-brand { border:0; padding:0; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+.recommend-brand { text-align:start; min-width:0; }
+.recommend-brand > span:last-child { min-width:0; }
+.recommend-gate-brand { display:block; margin:0 auto 16px; text-align:center; }
+.recommend-gate-brand .parola-gate-title { display:block; }
+.recommend-brand:focus-visible,.recommend-gate-brand:focus-visible { outline:2px solid #82cbff; outline-offset:4px; border-radius:8px; }
+.vault-modal.recommend-overlay[open] { align-items:center; justify-content:center; padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); overflow:hidden; backdrop-filter:none; }
+.recommend-card { position:relative; width:min(100%,420px); max-height:100%; overflow:auto; overscroll-behavior:contain; border:1px solid #385683; background:#142743; color:#edf4ff; border-radius:24px; padding:20px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; box-shadow:0 18px 60px #0005; }
+.recommend-close { position:absolute; inset-inline-end:10px; top:10px; }
+.recommend-logo { display:block; width:70px; height:70px; object-fit:contain; }
+.recommend-card h2 { font-size:20px; line-height:1.25; margin:0; overflow-wrap:anywhere; }
+.recommend-heading { margin:0; font-weight:600; font-size:14px; color:#abc3e8; }
+.recommend-qr { background:#fff; border-radius:12px; padding:4px; width:min(225px,100%); box-sizing:border-box; flex-shrink:0; }
+.recommend-qr img { width:100%; height:auto; display:block; aspect-ratio:1; }
+.recommend-hint,.recommend-status { font-size:13px; line-height:1.5; margin:0; color:#b8cbe7; }
+.recommend-actions { width:100%; display:grid; gap:8px; }
+.recommend-actions button { min-height:44px; width:100%; justify-content:center; white-space:normal; overflow-wrap:anywhere; }
+html[data-theme="light"] .recommend-card { background:#fff; color:#17304c; border-color:#cbd8e7; }
+html[data-theme="light"] .recommend-heading,html[data-theme="light"] .recommend-hint,html[data-theme="light"] .recommend-status { color:#445e7a; }
+@media(max-height:630px) { .recommend-card { padding:14px; gap:7px; } .recommend-logo { width:48px;height:48px; } .recommend-qr { width:min(180px,100%); } }

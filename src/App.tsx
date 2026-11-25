@@ -43,6 +43,9 @@ import { validateNewMasterPassword, masterPasswordStrength } from './masterPassw
 import { trackPasswordHistory } from './insights';
 import PasswordHistory from './PasswordHistory';
 import VaultModal from './VaultModal';
+import RecommendApp from './RecommendApp';
+import { RECOMMEND_TEXT } from './recommendI18n';
+import { useActiveLanguage as useRecommendationLanguage } from './i18n';
 import ImageViewer from './ImageViewer';
 import { applyActivityBatch } from './activityBatch';
 import type { PendingActivity } from './activityBatch';
@@ -363,6 +366,8 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showRecommend, setShowRecommend] = useState(false);
+  const recommendLabel = RECOMMEND_TEXT[useRecommendationLanguage()][0];
   const [previewImage, setPreviewImage] = useState<number | null>(null);
   const [editing, setEditing] = useState<VaultEntry | null>(null);
   const [reveal, setReveal] = useState<string[]>([]);
@@ -533,7 +538,7 @@ export default function App() {
     dataRef.current = null;
     hiddenSince.current = null;
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
-    setShowOCR(false); setShowQuickAdd(false);
+    setShowRecommend(false); setShowOCR(false); setShowQuickAdd(false);
     setShowBackupPanel(false); setShowMasterChange(false); setShowLocalSnapshots(false);
     setPreviewImage(null); setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
@@ -1103,8 +1108,7 @@ export default function App() {
             {SUPPORTED_LANGUAGES.map(item => <option key={item.code} value={item.code}>{item.nativeName}</option>)}
           </select>
         </label>
-        <div className="brand-icon large"><img src="/parola-icon.png" alt="Parola" /></div>
-        <p className="eyebrow parola-gate-title">PASSWORT MANAGER: PAROLA</p>
+        <button type="button" className="recommend-gate-brand" onClick={() => setShowRecommend(true)} aria-label={recommendLabel}><span className="brand-icon large"><img src="/parola-icon.png" alt="" /></span><span className="eyebrow parola-gate-title">PASSWORT MANAGER: PAROLA</span></button>
         <h1>{hasVault ? <>{l('vaultHero')}<br/><span>{l('protectedHero')}</span></> : <>{l('passwordHero')}<br/><span>{l('simpleHero')}</span></>}</h1>
         <p className="lock-intro">{hasVault
           ? l('openIntro')
@@ -1139,6 +1143,7 @@ export default function App() {
         <p className="lock-footnote">{hasVault ? l('existingFootnote') : l('newFootnote')}</p>
       </section>
       <footer className="lock-footer">Passwort Manager: Parola · by Shadowless Studios</footer>
+      {showRecommend && <RecommendApp onClose={() => setShowRecommend(false)}/>}
     </main>
   );
 
@@ -1150,7 +1155,7 @@ export default function App() {
       (tab==='vault'?' vault-landing':'')}>
       <div className="app-content">
         <header className="topbar">
-          <div className="brand-line"><div className="brand-icon"><img src="/parola-icon.png" alt="" /></div><div><strong>Passwort Manager: <span>Parola</span></strong><small>SHADOWLESS STUDIOS</small></div></div>
+          <button type="button" className="brand-line recommend-brand" aria-label={recommendLabel} title={recommendLabel} onClick={() => setShowRecommend(true)}><span className="brand-icon"><img src="/parola-icon.png" alt="" /></span><span><strong>Passwort Manager: <span>Parola</span></strong><small>SHADOWLESS STUDIOS</small></span></button>
           <div className="top-actions">
             <span className="security-indicator"><span className="status-dot"/> {t('vault.encrypted')}</span>
             {!simple && <button type="button" className="mode-switch compact-switch" title="Bedienmodus wechseln"
@@ -1601,6 +1606,7 @@ export default function App() {
       {showOCR && <OcrCapture onClose={() => setShowOCR(false)} onReview={setEditing}/>}
       {editing && <EntryEditor key={editing.id} entry={editing} categories={categories} people={people} simple={simple} ultra={ultra} onClose={() => setEditing(null)} onSave={saveEntry}
         onCreateCategory={createCategoryFromEntry}/>}
+      {showRecommend && <RecommendApp onClose={() => setShowRecommend(false)}/>}
       {notice && <div className="toast" role="status"><Check size={18}/>{notice}</div>}
     </div>
   );
