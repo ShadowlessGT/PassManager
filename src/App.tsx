@@ -42,6 +42,8 @@ import { generateStrongPassword } from './passwordGenerator';
 import { validateNewMasterPassword, masterPasswordStrength } from './masterPassword';
 import { trackPasswordHistory } from './insights';
 import PasswordHistory from './PasswordHistory';
+import VaultModal from './VaultModal';
+import ImageViewer from './ImageViewer';
 import { applyActivityBatch } from './activityBatch';
 import type { PendingActivity } from './activityBatch';
 import { App as NativeApp } from '@capacitor/app';
@@ -361,6 +363,7 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<number | null>(null);
   const [editing, setEditing] = useState<VaultEntry | null>(null);
   const [reveal, setReveal] = useState<string[]>([]);
   const [showExtraDetails, setShowExtraDetails] = useState(false);
@@ -532,7 +535,7 @@ export default function App() {
     setKey(null); setData(null); setSalt(''); setMaster(''); setConfirm('');
     setShowOCR(false); setShowQuickAdd(false);
     setShowBackupPanel(false); setShowMasterChange(false); setShowLocalSnapshots(false);
-    setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
+    setPreviewImage(null); setSelectedId(null); setEditing(null); setReveal([]); setShowExtraDetails(false); setTab('vault');
     setCategoryFilter(null); setPersonFilter(null); setQuery('');
   }
 
@@ -781,7 +784,7 @@ export default function App() {
     selectedIdRef.current = id;
     if (activityFlushTimer.current !== null) window.clearTimeout(activityFlushTimer.current);
     activityFlushTimer.current = null;
-    setSelectedId(id); setReveal([]); setShowExtraDetails(false);
+    setPreviewImage(null); setSelectedId(id); setReveal([]); setShowExtraDetails(false);
     recordActivity(id, 'open');
   }
 
@@ -1509,10 +1512,11 @@ export default function App() {
 
       <nav className="bottom-nav" aria-label="Hauptnavigation">{NAV.filter(item => !simple || ['vault','categories','settings'].includes(item.id)).map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={tab === item.id ? 'nav-item selected' : 'nav-item'} onClick={() => { setTab(item.id); setCategoryFilter(null); setPersonFilter(null); setQuery(''); }}><Icon size={21} strokeWidth={tab === item.id ? 2.5 : 1.8}/><span>{t(NAV_TEXT[item.id])}</span></button>; })}</nav>
 
-      {selected && <div className="overlay detail-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedId(null); }}>
-        <section className="sheet details-sheet" role="dialog" aria-modal="true" aria-label={selected.title}>
-          <header className="sheet-header"><button className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
-          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <img src={selected.images[0]} alt=""/> :
+      {selected && <VaultModal key={selected.id} className="overlay detail-overlay" label="Eintrag anzeigen" freezePage
+        onClose={() => { setPreviewImage(null); setSelectedId(null); }}>
+        <section className="sheet details-sheet" aria-label={selected.title}>
+          <header className="sheet-header"><button className="icon-btn" onClick={() => { setPreviewImage(null); setSelectedId(null); }} aria-label="Zurück"><ArrowLeft size={20}/></button><h2>Eintrag anzeigen</h2><button className="icon-btn" onClick={() => { setPreviewImage(null); setEditing(selected); setSelectedId(null); }} aria-label="Bearbeiten"><Edit3 size={19}/></button></header>
+          <div className="detail-top"><div className="detail-avatar">{selected.images[0] ? <button className="detail-avatar-image" type="button" aria-label="Eintragsbild vergrößern" onClick={() => setPreviewImage(0)}><img src={selected.images[0]} alt=""/></button> :
               selected.icon ? <EntryIcon id={selected.icon} size={34}/> : getInitials(selected.title)}</div><h2 className="detail-entry-name">{selected.icon && <EntryIcon id={selected.icon} size={22}/>}<span>{selected.title}</span></h2>{selected.description && <p>{selected.description}</p>}<div className="tag-row">{selected.person && <span>{selected.person}</span>}{selected.categories.map(tag => <span key={tag}>{tag}</span>)}{(selected.tags??[]).map(tag=><span key={tag}>#{tag}</span>)}</div></div>
           <div className="detail-fields">
             {selected.username && <div className="detail-field"><span><UserRound size={16}/> Benutzername</span><div><strong>{selected.username}</strong><button className="icon-btn compact" onClick={() => void copyValue(selected.username, 'Benutzername', selected.id, 'Benutzername')} aria-label="Benutzername kopieren"><Copy size={18}/></button></div></div>}
@@ -1540,14 +1544,15 @@ export default function App() {
             </div>)}
             {selected.website && <div className="detail-field"><span><Globe2 size={16}/> Website</span><div><strong>{selected.website}</strong>{safeUrl(selected.website) && <a href={safeUrl(selected.website)!} target="_blank" rel="noopener noreferrer" aria-label="Website öffnen"><ExternalLink size={18}/></a>}</div></div>}
             {selected.notes && <div className="detail-field note-field"><span><Edit3 size={16}/> Kommentare / Notizen</span><p>{selected.notes}</p></div>}
-            {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder</span><div className="detail-images">{selected.images.map((image, index) => <img key={index} src={image} loading="lazy" decoding="async" alt={'Anhang ' + (index + 1)}/>)}</div></div>}
             </>}
+            {selected.images.length > 0 && <div className="detail-field note-field"><span><ImagePlus size={16}/> Bilder · zum Vergrößern antippen</span><div className="detail-images">{selected.images.map((image, index) => <button className="detail-image-button" type="button" key={index} aria-label={'Bild ' + (index+1) + ' vergrößern'} onClick={() => setPreviewImage(index)}><img src={image} loading="lazy" decoding="async" alt={'Anhang ' + (index + 1)}/></button>)}</div></div>}
           </div>
           <div className="detail-footer"><span>Aktualisiert am {formatDate(selected.updatedAt)}</span>
             <button className="secondary-btn" type="button" onClick={() => void setEntryLocation(selected.id,'archived')}><Archive size={16}/> Archivieren</button>
             <button className="danger-btn"  type="button" onClick={() => void deleteEntry(selected)}><Trash2 size={16}/> Papierkorb</button></div>
         </section>
-      </div>}
+        {previewImage !== null && selected.images[previewImage] && <ImageViewer images={selected.images} initialIndex={previewImage} onClose={() => setPreviewImage(null)}/>}
+      </VaultModal>}
 
       {showImporter && <ImportPanel existing={entries} onClose={() => setShowImporter(false)} onImport={async (incoming, sourceColors = []) => {
         await mutateVault(current => {
